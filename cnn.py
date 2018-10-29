@@ -17,7 +17,6 @@ torch.manual_seed(seed)
 
 
  # Example implementaion of Simple CNN on CIFAR Dataset
- # (recognize hand-written digits)
 
  #1) depth of generated activation map depends on how many
  # filters we are going to use
@@ -37,11 +36,6 @@ class SimpleCNN(nn.Module):
      #Input channels = 3(RGB), output channels = 18(# of filters)
      self.conv1 = nn.Conv2d(3, 18, kernel_size=3, stride=1, padding=1)
      self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-     # Applies a linear transformation to
-     # the incoming data: :math:y = xA^T + b
-     #params: input features size, output features size, bias
-     # in our case 2nd param = 10, because 10 digits
-     #self.fc = nn.Linear(320,10)#instead of 320 we can add any number, and then recompute
 
      #4608 input features, 64 output features (see sizing flow below)
      self.fc1=torch.nn.Linear(18 * 16 * 16, 64)
@@ -84,60 +78,46 @@ def export_data(path):
     #2) transforms.Normalize(mean,std) normalizes a tensor to a
     # (mean, std) for (R, G, B)
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
     train_set = torchvision.datasets.CIFAR10(root=path, train=True, download=True, transform=transform)
-
     test_set = torchvision.datasets.CIFAR10(root=path, train=False, download=True, transform=transform)
 
     return(train_set, test_set)
 
 
 
-def outputSize(in_size, kernel_size, stride, padding):
+# def outputSize(in_size, kernel_size, stride, padding):
+#     output = int((in_size - kernel_size + 2*(padding)) / stride) + 1
+#
+#     return(output)
 
-    output = int((in_size - kernel_size + 2*(padding)) / stride) + 1
 
-    return(output)
-
-#DataLoader takes in a dataset and a sampler for loading (num_workers deals with system level memory)
-#If your model and data is small,
-# it shouldn’t be a problem.
-# Otherwise I would rather use the DataLoader
-# to load and push the samples onto the GPU than to make my model smaller.
 # Data loader. Combines a dataset and a sampler,
 # and provides single- or multi-process iterators over the dataset.
-def get_train_loader(batch_size, train_set):
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
-                                           sampler=train_sampler, num_workers=2)
+def get_loader(batch_size, set, sampler):
+    train_loader = torch.utils.data.DataLoader(set, batch_size=batch_size,
+                                           sampler=sampler, num_workers=2)
     return(train_loader)
 
 
 
 def createLossAndOptimizer(net, learning_rate=0.001):
-    #Loss function
     loss = torch.nn.CrossEntropyLoss()
-
-    #Optimizer
     optimizer = optim.Adam(net.parameters(), lr=learning_rate)
 
     return(loss, optimizer)
 
 
-def trainNet(net, batch_size, n_epochs, learning_rate,
-            test_loader, val_loader,train_sampler,test_sampler,val_sampler):
+def trainNet(net, train_batch_size, n_epochs, learning_rate,
+            train_loader, val_loader):
 
     #Print all of the hyperparameters of the training iteration:
     print("===== HYPERPARAMETERS =====")
-    print("batch_size=", batch_size)
+    print("batch_size=", train_batch_size)
     print("epochs=", n_epochs)
     print("learning_rate=", learning_rate)
     print("=" * 30)
 
-    #export data
-    train_set, test_set = export_data('./cifardata')
 
-     #Get training data
-    train_loader = get_train_loader(batch_size,train_set)
     n_batches = len(train_loader)
 
     #Create our loss and optimizer functions
@@ -199,6 +179,8 @@ def trainNet(net, batch_size, n_epochs, learning_rate,
 
 
 def main():
+    train_set, test_set = export_data('./cifardata')
+
     #Training
     n_training_samples = 20000
     train_sampler = SubsetRandomSampler(np.arange(n_training_samples, dtype=np.int64))
@@ -211,9 +193,9 @@ def main():
     n_test_samples = 5000
     test_sampler = SubsetRandomSampler(np.arange(n_test_samples, dtype=np.int64))
 
-    #Test and validation loaders have constant batch sizes, so we can define them directly
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=4, sampler=test_sampler, num_workers=2)
-    val_loader = torch.utils.data.DataLoader(train_set, batch_size=128, sampler=val_sampler, num_workers=2)
+    train_loader = get_loader(32,train_set,train_sampler)
+    val_loader = get_loader(128,train_set,val_sampler)
+    #test_loader = get_loader(4,test_set,test_sampler)
 
     CNN = SimpleCNN()
-    trainNet(CNN, batch_size=32, n_epochs=5, learning_rate=0.001,test_loader, val_loader,train_sampler,test_sampler,val_sampler)
+    trainNet(CNN, train_batch_size=32, n_epochs=5, learning_rate=0.001,train_loader, val_loader)
