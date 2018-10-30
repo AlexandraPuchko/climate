@@ -1,18 +1,24 @@
 # Base class for all neural network modules.
-import torch.nn as nn
+import torch
 import numpy as np
-import torch.optim as optim
-import torchvision
+import torch.nn as nn
 import time
+import torchvision
+import torch.optim as optim
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.utils.data.sampler import SubsetRandomSampler
+from utils import plot_images
 
 
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# Assume that we are on a CUDA machine, then this should print a CUDA device:
+print(device)
 
 
 
@@ -33,13 +39,12 @@ class SimpleCNN(nn.Module):
     def __init__(self):
      #inherit from Net
      super(SimpleCNN, self).__init__()
-     #Input channels = 3(RGB), output channels = 18(# of filters)
+     #Input channels = 3(RGB), output channels = 18(# of filters) (18 feature maps)
      self.conv1 = nn.Conv2d(3, 18, kernel_size=3, stride=1, padding=1)
      self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
      #4608 input features, 64 output features (see sizing flow below)
      self.fc1=torch.nn.Linear(18 * 16 * 16, 64)
-
      #64 input features, 10 output features for our 10 defined classes
      self.fc2=torch.nn.Linear(64, 10)
 
@@ -93,9 +98,16 @@ def export_data(path):
 
 # Data loader. Combines a dataset and a sampler,
 # and provides single- or multi-process iterators over the dataset.
-def get_loader(batch_size, set, sampler):
+def get_train_val_loader(batch_size, set, sampler, show_sampler):
     train_loader = torch.utils.data.DataLoader(set, batch_size=batch_size,
                                            sampler=sampler, num_workers=2)
+
+
+    if show_sampler :
+        data_iter = iter(train_loader)
+        images, labels = data_iter.next()
+        X = images.numpy().transpose([0, 2, 3, 1])
+        plot_images(X, labels)
     return(train_loader)
 
 
@@ -107,9 +119,7 @@ def createLossAndOptimizer(net, learning_rate=0.001):
     return(loss, optimizer)
 
 
-def trainNet(net, train_batch_size, n_epochs, learning_rate,
-            train_loader, val_loader):
-
+def trainNet(net, train_loader, val_loader,train_batch_size, n_epochs, learning_rate):
     #Print all of the hyperparameters of the training iteration:
     print("===== HYPERPARAMETERS =====")
     print("batch_size=", train_batch_size)
@@ -136,6 +146,8 @@ def trainNet(net, train_batch_size, n_epochs, learning_rate,
         for i, data in enumerate(train_loader, 0):
             #Get inputs
             inputs, labels = data
+
+            #inputs, labels = inputs.to(device), labels.to(device) //if with cuda
 
             #Wrap them in a Variable object
             inputs, labels = Variable(inputs), Variable(labels)
@@ -181,8 +193,9 @@ def trainNet(net, train_batch_size, n_epochs, learning_rate,
 def main():
     train_set, test_set = export_data('./cifardata')
 
-    #Training
+    #Training, CIFAR has 60.000 training samples
     n_training_samples = 20000
+    # define how much we want to sample out of a dataset
     train_sampler = SubsetRandomSampler(np.arange(n_training_samples, dtype=np.int64))
 
     #Validation
@@ -193,9 +206,17 @@ def main():
     n_test_samples = 5000
     test_sampler = SubsetRandomSampler(np.arange(n_test_samples, dtype=np.int64))
 
-    train_loader = get_loader(32,train_set,train_sampler)
-    val_loader = get_loader(128,train_set,val_sampler)
+    show_train_sampler = False
+    train_loader = get_train_val_loader(32,train_set,train_sampler,show_train_sampler)
+
+    show_val_sampler = False
+    val_loader = get_train_val_loader(128,train_set,val_sampler,show_val_sampler)
     #test_loader = get_loader(4,test_set,test_sampler)
 
     CNN = SimpleCNN()
-    trainNet(CNN, train_batch_size=32, n_epochs=5, learning_rate=0.001,train_loader, val_loader)
+
+    #net.to(device)  //if with cuda
+    trainNet(CNN, train_loader, val_loader,train_batch_size=32, n_epochs=5, learning_rate=0.001)
+
+# Run
+main()
