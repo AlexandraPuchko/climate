@@ -128,6 +128,8 @@ def trainNet(net, train_loader, val_loader,train_batch_size, n_epochs, learning_
     print("=" * 30)
 
 
+
+    #train loader contains data divided by batches
     n_batches = len(train_loader)
 
     #Create our loss and optimizer functions
