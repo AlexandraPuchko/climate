@@ -125,7 +125,7 @@ def split_data(pr, nc_time, norm_type, max_len):
      test_seqs = inputs[dev_ub:(num_seqs*max_len)] # Double check that this is the appropriate index
      test_times = times[dev_ub:(num_seqs*max_len)]
 
-     return train_seqs, dev_seqs, test_seqs, train_times, dev_times, test_times
+     return train_seqs, dev_seqs, test_seqs
 
 
 
@@ -205,18 +205,19 @@ def main():
     time = nc.variables['time'][:]
     pr = nc.variables['pr'][:]
 
+    channels = 1 #precipitation value
 
      #Load sequences
-    train_seqs, dev_seqs, test_seqs, train_times, dev_times, test_times = split_data(pr, time, args.normalize, args.max_len)
+    train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
 
-    convLSTM = ConvLSTMCell (input_size=(37, 37),
-                            input_dim=3,
-                            hidden_dim=64,
+    convLSTM = ConvLSTMCell (input_size=(128, 128),
+                            input_dim=channels,
+                            hidden_dim=[64, 64, 128],
                             kernel_size=(3, 3), bias=True)
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=0.1)
-    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs, train_times, dev_times, test_times);
+    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs);
 
 
 if __name__ == "__main__":

@@ -4,14 +4,7 @@ import torch
 
 
 # Questions to Brian:
-# 1)why do they concatenate input and h_(t-1) state? They apply same weights, is it just an approavch?
-# 2)split along channel axis?
-# 3) how to add peephole in the equation? (add C-1)
-# 5)impelemnt peepholes?How to do that?
-# 6) ask about sizes of matrices
-# 7) hidden cell can contain many hidden units? :/
-# 8) evaluate on dev set?
-
+# 2)split along channel axis? WHhy to multiply by 4 and then dividie by 4? Is not it the sam as doing nothing?
 
 class ConvLSTMCell(nn.Module):
 
@@ -42,32 +35,46 @@ class ConvLSTMCell(nn.Module):
         self.kernel_size = kernel_size
         self.padding     = kernel_size[0] // 2, kernel_size[1] // 2
         self.bias        = bias
-        print("self.input_dim: ",self.input_dim)
-        print("self.hidden_dim: ", self.hidden_dim)
-        print("sum : ",self.input_dim + self.hidden_dim)
 
-        self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-                              out_channels=4 * self.hidden_dim,
+        # self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
+        #                       out_channels=4 * self.hidden_dim,#because we have 4 gates
+        #                       kernel_size=self.kernel_size,
+        #                       padding=self.padding,
+        #                       bias=self.bias)
+        self.conv_h = nn.Conv2d(in_channels=self.hidden_dim,
+                              out_channels=4 * self.hidden_dim,#because we have 4 gates
                               kernel_size=self.kernel_size,
                               padding=self.padding,
                               bias=self.bias)
+
+        self.conv_x = nn.Conv2d(in_channels=self.input_dim, #input dim = # of features to describe vector
+                              out_channels=4 * self.hidden_dim,#because we have 4 gates (basically it is 4 * self.hidden_dim feature maps)
+                              kernel_size=self.kernel_size,
+                              padding=self.padding,
+                              bias=self.bias)
+
 
     def forward(self, input_tensor, cur_state):
 
         h_cur, c_cur = cur_state
 
+        # combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+        # combined_conv = self.conv(combined)
 
-        combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+        #apply convolution separately
+        h_conv = self.conv_h(h_cur)
+        h_i, h_f, h_o, h_g = torch.split(h_conv,self.hidden_dim, dim=1)
+        x_conv = self.conv_h(input_tensor)
+        x_i, x_f, x_o, x_g = torch.split(x_conv, self.hidden_dim, dim=1)
 
-        combined_conv = self.conv(combined)
 
-        #ask Brian
         #split along channel axis
-        cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
-        i = torch.sigmoid(cc_i)
-        f = torch.sigmoid(cc_f)
-        o = torch.sigmoid(cc_o)
-        g = torch.tanh(cc_g)
+        #cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
+        #add peepholes
+        i = torch.sigmoid(h_i + x_i)
+        f = torch.sigmoid(h_f + x_f)
+        o = torch.sigmoid(h_o + x_o)
+        g = torch.tanh(h_g + x_g)
 
         #how to add peephole in the equation? (add C-1)
         c_next = f * c_cur + i * g
@@ -77,6 +84,7 @@ class ConvLSTMCell(nn.Module):
 
     # (B*Cin*H*W)
     def init_hidden(self, batch_size):
+        #init tensor with zeros
         return (Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).cuda(),
                 Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).cuda())
 
@@ -111,7 +119,6 @@ class ConvLSTM(nn.Module):
 
             cell_list.append(ConvLSTMCell(input_size=(self.height, self.width),
                                           input_dim=cur_input_dim,
-                                          #should not it be self.hidden_dim[i-1]?
                                           hidden_dim=self.hidden_dim[i],
                                           kernel_size=self.kernel_size[i],
                                           bias=self.bias))
@@ -142,14 +149,17 @@ class ConvLSTM(nn.Module):
             raise NotImplementedError()
         else:
             #init as many hidden states, as there are batches
-            hidden_state = self._init_hidden(batch_size=input_tensor.size(0))
-
+            #we do stochastic
+            #hidden_state = self._init_hidden(batch_size=input_tensor.size(0))
+            hidden_state = self._init_hidden(batch_size=1)
 
         layer_output_list = []
         last_state_list   = []
 
-        #in my case I can get rid of time dim and batch dim
-        seq_len = input_tensor.size(1) #time
+        #60 months
+        seq_len = 60
+        #seq_len = input_tensor.size(1)
+        #contains 60 maps to imput for each cell month by month
         cur_layer_input = input_tensor
 
         for layer_idx in range(self.num_layers):
@@ -158,12 +168,15 @@ class ConvLSTM(nn.Module):
             h, c = hidden_state[layer_idx]
 
             output_inner = []
-            #from t = 0 to time
+            h_c_pairs = []
+            #from t = 0 to time (60 images)
             for t in range(seq_len):
 
                 #do forward on One layer, passing h and c, and get next H_t+1 and C_t+1
                 h, c = self.cell_list[layer_idx](input_tensor=cur_layer_input[:, t, :, :, :],
                                                  cur_state=[h, c])
+
+                h_c_pairs.append([h,c]) #save states and memory cells in an array
                 output_inner.append(h)
 
             layer_output = torch.stack(output_inner, dim=1)
@@ -176,7 +189,6 @@ class ConvLSTM(nn.Module):
             layer_output_list = layer_output_list[-1:]
             last_state_list   = last_state_list[-1:]
 
-            #trained_weights = model.fc1.weight.data??
 
         return layer_output_list, last_state_list
 
@@ -204,7 +216,7 @@ class ConvLSTM(nn.Module):
 
 
 
-def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs, train_times, dev_times, test_times):
+def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs):
 
         print('Training started...')
 
