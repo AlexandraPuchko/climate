@@ -1,9 +1,10 @@
 import netCDF4 as n
-import tensorflow as tf
 import argparse
 import numpy as np
-from convlstm import ConvLSTM
-from convlstm import ConvLSTMCell
+import torch.nn as nn
+import torch
+import torch.optim as optim
+from convlstm import ConvLSTM,trainNet
 
 
 
@@ -27,7 +28,7 @@ def parse_all_args():
      parser.add_argument("netcdf",
                          help="Data set(a nc)")
 
-     # Model Flags
+    #  # Model Flags
      parser.add_argument("-patience",
                          help="How many epochs to continue training without improving\
          dev accuracy (int)",
@@ -39,30 +40,30 @@ def parse_all_args():
                          default=0.001)
      parser.add_argument("-mb",
                          type=int,
-                         help="The minibatch size (an int) [default=128]",
-                         default=128)
+                         help="The minibatch size (an int) [default=1]",
+                         default=1)
      parser.add_argument("-num-steps",
                          type=int,
                          help="The number of steps to unroll for Truncated BPTT (an int) [default=20]",
                          default=20)
      parser.add_argument("-max-len",
                          type=int,
-                         help="The maximum length of a sequence (an int) [default=10]",
-                         default=10)
+                         help="The maximum length of a sequence (an int) [default=12]",
+                         default=12)
      parser.add_argument("-epochs",
                          type=int,
                          help="The number of epochs to train for (an int) [default=20]",
                          default=20)
-
-
-     # Normalization Flags
+     #
+     #
+    #  # Normalization Flags
      parser.add_argument("-normalize",
                          type=str,
                          choices=["log"],
                          help="Set normalization scheme. Choice must be in the set {log}")
-     parser.add_argument("-area_weighted",
-                         action='store_true',
-                         help="Train using area-weighted MSE loss function.")
+    #  parser.add_argument("-area_weighted",
+    #                      action='store_true',
+    #                      help="Train using area-weighted MSE loss function.")
 
      # Output Flags
      parser.add_argument("-dev_preds", type=str,
@@ -109,7 +110,7 @@ def split_data(pr, nc_time, norm_type, max_len):
          times.append(nc_time[i * max_len:(i + 1) * max_len])
 
      inputs = np.asarray(ins, dtype=np.float32)# Precipitation
-     inputs = inputs[:, :, :, :, np.newaxis]  # Adding 'channel' dimension to conform to ConvLSTM cell.
+     inputs = inputs[:, :, np.newaxis,:, :]  # Adding 'channel' dimension to conform to ConvLSTM cell.
      times = np.asarray(times, dtype=np.float32)
 
      # train (70%)
@@ -210,14 +211,18 @@ def main():
      #Load sequences
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
+    print(train_seqs.shape)
+    print(len(dev_seqs))
+    print(len(test_seqs))
 
-    convLSTM = ConvLSTMCell (input_size=(128, 128),
+    convLSTM = ConvLSTM(input_size=(64, 128),
                             input_dim=channels,
                             hidden_dim=[64, 64, 128],
-                            kernel_size=(3, 3), bias=True)
+                            kernel_size=(3, 3),
+                            num_layers=3)
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=0.1)
-    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs);
+    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args);
 
 
 if __name__ == "__main__":
