@@ -185,6 +185,7 @@ class ConvLSTM(nn.Module):
                 output_inner.append(h)
 
             layer_output = torch.stack(output_inner, dim=1)
+
             cur_layer_input = layer_output
 
             layer_output_list.append(layer_output)
@@ -195,8 +196,12 @@ class ConvLSTM(nn.Module):
             last_state_list   = last_state_list[-1:]
 
 
+            outputs = torch.split(layer_output_list,11,dim=1)
+            print(len(outputs))
+            train_outputs = nn.Linear(hidden_dim, 11)
 
-        return layer_output_list, last_state_list
+        return train_outputs, last_state_list
+        # return layer_output_list, last_state_list
 
 
 
@@ -250,8 +255,11 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
                 # training
                 optimizer.zero_grad()
-                #train_outputs = net.forward(mb_x, None)
-                train_outputs = net.forward(mb_x, None)
+                # is it needed? last_state_list?
+                # layer_output_list, last_state_list = net.forward(mb_x, None)
+                # outputs = layer_output_list.view(11,-1)
+                # train_outputs = nn.Linear(hidden_dim, 11)
+                train_outputs, last_state_list = net.forward(mb_x, None)
 
 
                 # compute the loss, gradients, and update the parameters by calling optimizer.step()
