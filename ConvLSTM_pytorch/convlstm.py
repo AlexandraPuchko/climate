@@ -118,6 +118,7 @@ class ConvLSTM(nn.Module):
         self.bias = bias
         self.return_all_layers = return_all_layers
 
+
         cell_list = []
         for i in range(0, self.num_layers):
             cur_input_dim = self.input_dim if i == 0 else self.hidden_dim[i-1]
@@ -195,10 +196,12 @@ class ConvLSTM(nn.Module):
             layer_output_list = layer_output_list[-1:]
             last_state_list   = last_state_list[-1:]
 
-
-            outputs = torch.split(layer_output_list,11,dim=1)
-            print(len(outputs))
-            train_outputs = nn.Linear(hidden_dim, 11)
+        #apply linear layer on top?? The Fully connected layer has as input size the value C * H * W. Relu?
+        print(layer_output_list[0].shape)
+        in_features = layer_output_list[0].size(2)
+        linear = nn.Linear(in_features=in_features, out_features=1, bias=True)
+        train_inputs = layer_output_list[0].view(layer_output_list[0].size(1),-1)
+        train_outputs = linear(train_inputs)
 
         return train_outputs, last_state_list
         # return layer_output_list, last_state_list
@@ -256,10 +259,9 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 # training
                 optimizer.zero_grad()
                 # is it needed? last_state_list?
-                # layer_output_list, last_state_list = net.forward(mb_x, None)
-                # outputs = layer_output_list.view(11,-1)
-                # train_outputs = nn.Linear(hidden_dim, 11)
                 train_outputs, last_state_list = net.forward(mb_x, None)
+                print(train_outputs.shape)
+                print(mb_y.shape)
 
 
                 # compute the loss, gradients, and update the parameters by calling optimizer.step()
@@ -277,6 +279,8 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
 
                 dev_outputs = net.forward(mb_x, None)
+                print(dev_outputs.shape)
+                print(mb_y.shape)
                 dev_loss = loss_function(dev_outputs, mb_y)
 
 
