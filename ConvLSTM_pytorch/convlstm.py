@@ -197,8 +197,10 @@ class ConvLSTM(nn.Module):
             last_state_list   = last_state_list[-1:]
 
         #apply linear layer on top?? The Fully connected layer has as input size the value C * H * W. Relu?
+        print("Last layer output shape: ")
         print(layer_output_list[0].shape)
         in_features = layer_output_list[0].size(2)
+        print("in_features: ",in_features)
         linear = nn.Linear(in_features=in_features, out_features=1, bias=True)
         train_inputs = layer_output_list[0].view(layer_output_list[0].size(1),-1)
         train_outputs = linear(train_inputs)
