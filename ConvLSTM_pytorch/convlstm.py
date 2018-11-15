@@ -38,19 +38,8 @@ class ConvLSTMCell(nn.Module):
         self.padding     = kernel_size[0] // 2, kernel_size[1] // 2
         self.bias        = bias
 
-        # self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-        #                       out_channels=4 * self.hidden_dim,#because we have 4 gates
-        #                       kernel_size=self.kernel_size,
-        #                       padding=self.padding,
-        #                       bias=self.bias)
-        self.conv_h = nn.Conv2d(in_channels=self.hidden_dim,
+        self.conv = nn.Conv2d(in_channels=self.input_dim + 2*self.hidden_dim,
                               out_channels=4 * self.hidden_dim,#because we have 4 gates
-                              kernel_size=self.kernel_size,
-                              padding=self.padding,
-                              bias=self.bias)
-
-        self.conv_x = nn.Conv2d(in_channels=self.input_dim, #input dim = # of features to describe vector
-                              out_channels=4 * self.hidden_dim,#because we have 4 gates (basically it is 4 * self.hidden_dim feature maps)
                               kernel_size=self.kernel_size,
                               padding=self.padding,
                               bias=self.bias)
@@ -60,26 +49,17 @@ class ConvLSTMCell(nn.Module):
 
         h_cur, c_cur = cur_state
 
-        # combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
-        # combined_conv = self.conv(combined)
-
-        #apply convolution separately
-        x_c = self.conv_x(input_tensor)
-        x_i, x_f, x_o, x_g = torch.split(x_c, self.hidden_dim, dim=1)
-        h_c = self.conv_h(h_cur)
-        h_i, h_f, h_o, h_g = torch.split(h_c,self.hidden_dim, dim=1)
-
-
+        #apply convolution
+        combined = torch.cat([input_tensor, h_cur,c_cur], dim=1) # concatenate along channel axis
+        combined_conv = self.conv(combined)
 
         #split along channel axis
-        #cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
-        #add peepholes
-        i = torch.sigmoid(h_i + x_i)
-        f = torch.sigmoid(h_f + x_f)
-        o = torch.sigmoid(h_o + x_o)
-        g = torch.tanh(h_g + x_g)
+        cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
+        i = torch.sigmoid(cc_i)
+        f = torch.sigmoid(cc_f)
+        o = torch.sigmoid(cc_o)
+        g = torch.tanh(cc_g)
 
-        #how to add peephole in the equation? (add C-1)
         c_next = f * c_cur + i * g
         h_next = o * torch.tanh(c_next)
         return h_next, c_next
@@ -109,7 +89,6 @@ class ConvLSTM(nn.Module):
             raise ValueError('Inconsistent list length.')
 
         self.height, self.width = input_size
-
         self.input_dim  = input_dim
         self.hidden_dim = hidden_dim
         self.kernel_size = kernel_size
@@ -117,6 +96,7 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
+
 
 
         cell_list = []
@@ -197,17 +177,23 @@ class ConvLSTM(nn.Module):
             last_state_list   = last_state_list[-1:]
 
         #apply linear layer on top?? The Fully connected layer has as input size the value C * H * W. Relu?
-        print("Last layer output shape: ")
+        #print(layer_output_list[0].shape)
         print(layer_output_list[0].shape)
-        in_features = layer_output_list[0].size(2)
-        print("in_features: ",in_features)
-        linear = nn.Linear(in_features=in_features, out_features=1, bias=True)
-        train_inputs = layer_output_list[0].view(layer_output_list[0].size(1),-1)
-        train_outputs = linear(train_inputs)
+        sliced_tensor = r = torch.squeeze(layer_output_list[0], 0)#remove first column
+        print(sliced_tensor.shape)
+        in_channels_to_conv = sliced_tensor.size(1)
+        print(in_channels_to_conv)
+        padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
+        conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
+                              out_channels=1,# precipitation value
+                              kernel_size=(3,3),
+                              padding=padding_size,
+                              bias=self.bias)
+        train_outputs = conv_h(sliced_tensor)
+        #add first dim back
+        #train_outputs = train_outputs.unsqueeze_(0)
 
         return train_outputs, last_state_list
-        # return layer_output_list, last_state_list
-
 
 
 
@@ -262,12 +248,13 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 optimizer.zero_grad()
                 # is it needed? last_state_list?
                 train_outputs, last_state_list = net.forward(mb_x, None)
-                print(train_outputs.shape)
-                print(mb_y.shape)
 
 
+
+                #convert mb_y to tensor
+                mb_y_tensor = torch.squeeze(torch.tensor(mb_y),0)
                 # compute the loss, gradients, and update the parameters by calling optimizer.step()
-                train_loss = loss(train_outputs, mb_y)
+                train_loss = loss(train_outputs, mb_y_tensor)
                 print(train_loss)
                 train_loss.backward()
                 optimizer.step()
@@ -281,9 +268,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
 
                 dev_outputs = net.forward(mb_x, None)
-                print(dev_outputs.shape)
-                print(mb_y.shape)
-                dev_loss = loss_function(dev_outputs, mb_y)
+                dev_loss = loss_function(dev_outputs, mb_y_tensor)
 
 
 
