@@ -211,9 +211,6 @@ def main():
      #Load sequences
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
-    print(train_seqs.shape)
-    print(len(dev_seqs))
-    print(len(test_seqs))
 
     convLSTM = ConvLSTM(input_size=(64, 128),
                             input_dim=channels,

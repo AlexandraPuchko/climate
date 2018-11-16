@@ -190,8 +190,7 @@ class ConvLSTM(nn.Module):
                               padding=padding_size,
                               bias=self.bias)
         train_outputs = conv_h(sliced_tensor)
-        #add first dim back
-        #train_outputs = train_outputs.unsqueeze_(0)
+
 
         return train_outputs, last_state_list
 
@@ -232,7 +231,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             train_seqs = train_seqs[idx]
 
 
-
          # train on each minibatch
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
 
@@ -246,16 +244,14 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
                 # training
                 optimizer.zero_grad()
-                # is it needed? last_state_list?
                 train_outputs, last_state_list = net.forward(mb_x, None)
-
-
-
                 #convert mb_y to tensor
                 mb_y_tensor = torch.squeeze(torch.tensor(mb_y),0)
+                print("mb_x: " + str(mb_x.shape))
+                print("train_outputs: " + str(train_outputs.shape))
+                print("mb_y_tensor: " + str(mb_y_tensor.shape))
                 # compute the loss, gradients, and update the parameters by calling optimizer.step()
                 train_loss = loss(train_outputs, mb_y_tensor)
-                print(train_loss)
                 train_loss.backward()
                 optimizer.step()
 
@@ -266,9 +262,13 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 dev_y = dev_seqs[:, 1:args.max_len]
                 # dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
                 # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
+                dev_y_tensor = torch.squeeze(torch.tensor(dev_y),0)
+                print("dev_x: " + str(dev_x.shape))
+                print("mb_y_tensor:  " + str(dev_y_tensor.shape))
 
-                dev_outputs = net.forward(mb_x, None)
-                dev_loss = loss_function(dev_outputs, mb_y_tensor)
+                dev_outputs = net.forward(dev_x, None)
+                print("dev_outputs: " + str(dev_outputs.shape))
+                dev_loss = loss(dev_outputs, dev_y_tensor)
 
 
 
