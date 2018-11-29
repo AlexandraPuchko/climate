@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pdb
 import logging
-from convLSTM import convLSTM
+#from convLSTM import convLSTM
 
 
 # NOTE: These constants assume the model converges around epoch 100
@@ -29,7 +29,7 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST
     LIN_DECAY_CONST = -1.0/float(epochs)
 
-    
+
 
 def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
