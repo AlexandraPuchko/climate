@@ -4,7 +4,8 @@ import numpy as np
 import torch.nn as nn
 import torch
 import torch.optim as optim
-from convlstm import ConvLSTM,trainNet
+from convLSTM import ConvLSTM
+from train import trainNet
 
 
 
