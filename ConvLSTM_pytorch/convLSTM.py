@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import numpy as np
 from torch.autograd import Variable
 from cell import ConvLSTMCell
 
@@ -94,10 +95,10 @@ class ConvLSTM(nn.Module):
             #      Flip biased coin, take ground truth with a probability of 'epsilon'
             #      ELSE take model output.
             #print("binomial: ", np.random.binomial(1, epsilon, 1)[0])
-            # if np.random.binomial(1, epsilon, 1)[0]:
-            #     train_x = cur_layer_input[:, t, :, :, :]
-            # else:
-            #     train_x = train_y
+            if np.random.binomial(1, epsilon, 1)[0]:
+                train_x = cur_layer_input[:, t, :, :, :]
+            else:
+                train_x = train_y
             train_x = cur_layer_input[:, t, :, :, :]
 
             for layer_idx in range(self.num_layers):
