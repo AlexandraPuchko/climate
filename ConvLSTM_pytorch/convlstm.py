@@ -123,8 +123,6 @@ class ConvLSTM(nn.Module):
         self.return_all_layers = return_all_layers
         self.decay_func = "linear" #might be changed to exp or negative sigmoid
 
-
-
         cell_list = []
         for i in range(0, self.num_layers):
             cur_input_dim = self.input_dim if i == 0 else self.hidden_dim[i-1]
@@ -137,8 +135,9 @@ class ConvLSTM(nn.Module):
         #module list is like a Python list. It is similar to forward, but forward has its embedded forward method,
         # whereas we should redefine our own in ModuleList
         self.cell_list = nn.ModuleList(cell_list)
+        self._hidden = self._init_hidden(1)
 
-    def forward(self, input_x, hidden_state, epsilon):
+    def forward(self, input_x, hidden_state, epsilon, is_t0=False):
         """
 
         Parameters
@@ -155,23 +154,20 @@ class ConvLSTM(nn.Module):
         #use GPU
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
             input_x = input_tensor.permute(1, 0, 2, 3, 4)
         # else:
         #     input_tensor = input_tensor.permute(1, 0, 3, 4, 2)
 
-
-
         input_x = torch.from_numpy(input_x)
         #.float().to(device)
 
-
-        if hidden_state is  None:
+        if hidden_state is None:
             #TODO:learnable weights
-            hidden_state = self._init_hidden(batch_size=1)
-
+            hidden_state = self._hidden
+        else:
+            hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
 
         ## of months in a sequence
         seq_len = input_x.size(1)
@@ -228,9 +224,7 @@ class ConvLSTM(nn.Module):
 
         #convert all outputs from the current sequence to tensor (stack along feature axes)
         train_y_vals = torch.stack(train_y_vals,dim=0)
-
         return train_y_vals, last_layer_hidden_states
-
 
 
     def _init_hidden(self, batch_size):
@@ -294,8 +288,9 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
                 hidden_state = last_layer_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
-                print(train_loss)
-                train_loss.backward(retain_graph=True)
+                print("Train loss = %.7f" % train_loss.data)
+#                train_loss.backward(retain_graph=True)
+                train_loss.backward()
                 optimizer.step()
 
 

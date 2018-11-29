@@ -207,9 +207,9 @@ def main():
 
     convLSTM = ConvLSTM(input_size=(64, 128),
                             input_dim=channels,
-                            hidden_dim=[64],
+                            hidden_dim=[2,4,4,8,8,32,32],
                             kernel_size=(3, 3),
-                            num_layers=1)
+                            num_layers=7)
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
     trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args);
