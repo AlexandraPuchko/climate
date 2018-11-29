@@ -4,7 +4,6 @@ import torch
 import numpy as np
 import pdb
 import logging
-#from convLSTM import convLSTM
 
 
 # NOTE: These constants assume the model converges around epoch 100
@@ -13,7 +12,7 @@ LIN_DECAY_CONST = (-1.0 / 20.0)
 
 #Static decay functions
 def linear(epoch):
-    return maximum(0, 1 + (LIN_DECAY_CONST * epoch))
+    return max(0, 1 + (LIN_DECAY_CONST * epoch))
 
 def update_epsilon(epoch):
     return linear(epoch)

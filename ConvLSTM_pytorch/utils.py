@@ -9,7 +9,6 @@ from train import trainNet
 
 
 
-
 def parse_all_args():
      """
      Parses arguments
@@ -187,7 +186,6 @@ def createLossAndOptimizer(net, learning_rate):
     loss = nn.MSELoss()
     optimizer = optim.SGD(net.parameters(), learning_rate)
     return(loss, optimizer)
-
 
 
 def main():
