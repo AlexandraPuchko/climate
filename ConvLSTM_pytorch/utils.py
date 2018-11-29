@@ -9,13 +9,6 @@ from convlstm import ConvLSTM,trainNet
 
 
 
-TRAIN_MIN = 0
-TRAIN_MAX = 0
-MEDIAN_SHIFT_FACTOR = 0
-ZERO_SHIFT_FACTOR = (10 ** -6)
-SCALE_FACTOR = 10000
-
-
 def parse_all_args():
      """
      Parses arguments
@@ -49,7 +42,7 @@ def parse_all_args():
      parser.add_argument("-max-len",
                          type=int,
                          help="The maximum length of a sequence (an int) [default=12]",
-                         default=60)#5 * 12 months = 5 years
+                         default=24)#2 * 12 months = 2 years
      parser.add_argument("-epochs",
                          type=int,
                          help="The number of epochs to train for (an int) [default=20]",
@@ -214,11 +207,11 @@ def main():
 
     convLSTM = ConvLSTM(input_size=(64, 128),
                             input_dim=channels,
-                            hidden_dim=[64, 64],
+                            hidden_dim=[64],
                             kernel_size=(3, 3),
-                            num_layers=2)
+                            num_layers=1)
 
-    loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=0.1)
+    loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
     trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args);
 
 

@@ -3,10 +3,35 @@ from torch.autograd import Variable
 import torch
 import numpy as np
 import pdb
+import logging
 
 
-# Questions to Brian:
-# 2)split along channel axis? WHhy to multiply by 4 and then dividie by 4? Is not it the sam as doing nothing?
+# NOTE: These constants assume the model converges around epoch 100
+LIN_DECAY_CONST = (-1.0 / 20.0)
+
+
+#Static decay functions
+def linear(epoch):
+    return maximum(0, 1 + (LIN_DECAY_CONST * epoch))
+
+def update_epsilon(epoch):
+    return linear(epoch)
+
+
+def compute_decay_constants(epochs):
+    """
+    Computes the decay constants used for computing scheduled sampling epsilon value
+
+    : param epochs: (int) NUmber of iterations over the training set.
+    """
+    global LIN_DECAY_CONST
+
+    LIN_DECAY_CONST
+    LIN_DECAY_CONST = -1.0/float(epochs)
+
+
+
+
 
 class ConvLSTMCell(nn.Module):
 
@@ -96,6 +121,7 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
+        self.decay_func = "linear" #might be changed to exp or negative sigmoid
 
 
 
@@ -112,7 +138,7 @@ class ConvLSTM(nn.Module):
         # whereas we should redefine our own in ModuleList
         self.cell_list = nn.ModuleList(cell_list)
 
-    def forward(self, input_tensor, hidden_state):
+    def forward(self, input_x, hidden_state, epsilon):
         """
 
         Parameters
@@ -124,75 +150,86 @@ class ConvLSTM(nn.Module):
 
         Returns
         -------
-        last_state_list, layer_output
+        train_y_vals, last_layer_hidden_states
         """
+        #use GPU
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
-            input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
+            input_x = input_tensor.permute(1, 0, 2, 3, 4)
         # else:
         #     input_tensor = input_tensor.permute(1, 0, 3, 4, 2)
 
-        input_tensor = torch.tensor(input_tensor)
-        # Implement stateful ConvLSTM
-        if hidden_state is not None:
-            raise NotImplementedError()
-        else:
-            #init as many hidden states, as there are batches
-            #we do stochastic
-            #hidden_state = self._init_hidden(batch_size=input_tensor.size(0))
+
+
+        input_x = torch.from_numpy(input_x)
+        #.float().to(device)
+
+
+        if hidden_state is  None:
+            #TODO:learnable weights
             hidden_state = self._init_hidden(batch_size=1)
 
-        layer_output_list = []
-        last_state_list   = []
 
-        #60 months
-        seq_len = input_tensor.size(1)
-        #contains 12 maps to imput for each cell month by month
-        cur_layer_input = input_tensor
+        ## of months in a sequence
+        seq_len = input_x.size(1)
+        #contains  maps to input for each cell month by month
+        cur_layer_input = input_x
 
-        for layer_idx in range(self.num_layers):
+        #from t = 0 to T
+        one_timestamp_output = []
 
-            #take hidden states for this layer
-            h, c = hidden_state[layer_idx]
+        #first assume train_x is a true input map and true_y is train_x
+        train_x = cur_layer_input[:, 0, :, :, :]
+        train_y = train_x
 
-            output_inner = []
-            #save them for scheduled sampling
-            h_c_pairs = []
-            #from t = 0 to time (60 images)
-            for t in range(seq_len):
-                #do forward on One layer, passing h and c, and get next H_t+1 and C_t+1
-                h, c = self.cell_list[layer_idx](input_tensor=cur_layer_input[:, t, :, :, :],
-                                                 cur_state=[h, c])
-                output_inner.append(h)
+        #take hidden states for first layer
+        hidden_states = hidden_state
+        # save all predicted maps to compute the loss
+        train_y_vals = []
+        for t in range(seq_len):
+            #NOTE: This is where we use scheduled sampling to set up our next input.
+            #      Flip biased coin, take ground truth with a probability of 'epsilon'
+            #      ELSE take model output.
+            #print("binomial: ", np.random.binomial(1, epsilon, 1)[0])
+            # if np.random.binomial(1, epsilon, 1)[0]:
+            #     train_x = cur_layer_input[:, t, :, :, :]
+            # else:
+            #     train_x = train_y
+            train_x = cur_layer_input[:, t, :, :, :]
 
-            layer_output = torch.stack(output_inner, dim=1)
+            for layer_idx in range(self.num_layers):
+                h, c = self.cell_list[layer_idx](input_tensor=train_x,
+                                                 cur_state=hidden_states[layer_idx])
+                train_x = h
+                one_timestamp_output.append([h, c])
 
-            cur_layer_input = layer_output
-
-            layer_output_list.append(layer_output)
-            last_state_list.append([h, c])
-
-        if not self.return_all_layers:
-            layer_output_list = layer_output_list[-1:]
-            last_state_list   = last_state_list[-1:]
-
-        #apply linear layer on top?? The Fully connected layer has as input size the value C * H * W. Relu?
-        #print(layer_output_list[0].shape)
-        print(layer_output_list[0].shape)
-        sliced_tensor = r = torch.squeeze(layer_output_list[0], 0)#remove first column
-        print(sliced_tensor.shape)
-        in_channels_to_conv = sliced_tensor.size(1)
-        print(in_channels_to_conv)
-        padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
-        conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
-                              out_channels=1,# precipitation value
-                              kernel_size=(3,3),
-                              padding=padding_size,
-                              bias=self.bias)
-        train_outputs = conv_h(sliced_tensor)
+            # save all pairs (c_i, h_i) to feed the next timestep
+            hidden_states = one_timestamp_output
 
 
-        return train_outputs, last_state_list
+            #get predicted value of h from the last layer for t = i
+            last_hidden_state = one_timestamp_output[-1][0]
+            in_channels_to_conv = last_hidden_state.size(1)
+            padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
+            conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
+                                  out_channels=1,# precipitation value
+                                  kernel_size=(3,3),
+                                  padding=padding_size,
+                                  bias=self.bias)
+
+            train_y = conv_h(last_hidden_state)
+            train_y_vals.append(torch.squeeze(train_y, 0))
+            #empty array of (h_i,c_i)
+            one_timestamp_output = []
+            last_layer_hidden_states = hidden_states
+
+        #convert all outputs from the current sequence to tensor (stack along feature axes)
+        train_y_vals = torch.stack(train_y_vals,dim=0)
+
+        return train_y_vals, last_layer_hidden_states
 
 
 
@@ -225,95 +262,107 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
         bad_count = 0
         num_seqs = len(train_seqs)
 
+        #for scheduled sampling
+        epsilon = 1.0
+        compute_decay_constants(args.epochs)
+
         for epoch in range(args.epochs):
+
+            #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
+            hidden_state = None
+            print("Number of sequences in a training set: %d" % int(np.floor(num_seqs / args.mb)))#98
 
-
-         # train on each minibatch
+            #do first forward on a first sequence, then do k = len(sequence) shift
+            # and apply hidden states and memory cell states from the last forward to a new image
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
-
                 row_start = mb_row*args.mb
                 row_end = np.min([(mb_row+1)*args.mb, num_seqs]) # Last minibatch might be partial
 
+
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
-                # mb_h0 = np.zeros(shape=((row_end-row_start),64, 128, 1), dtype=np.float32)
-                # mb_c0 = np.zeros(shape=((row_end-row_start), 64, 128, 1), dtype=np.float32)
+                mb_y= torch.squeeze(torch.tensor(mb_y),0)
 
                 # training
                 optimizer.zero_grad()
-                train_outputs, last_state_list = net.forward(mb_x, None)
-                #convert mb_y to tensor
-                mb_y_tensor = torch.squeeze(torch.tensor(mb_y),0)
-                print("mb_x: " + str(mb_x.shape))
-                print("train_outputs: " + str(train_outputs.shape))
-                print("mb_y_tensor: " + str(mb_y_tensor.shape))
-                # compute the loss, gradients, and update the parameters by calling optimizer.step()
-                train_loss = loss(train_outputs, mb_y_tensor)
-                train_loss.backward()
+                train_outputs, last_layer_hidden_states = net.forward(mb_x, hidden_state, epsilon)
+
+                #update hidden_state to next sequence
+                hidden_state = last_layer_hidden_states
+
+                train_loss = loss(train_outputs, mb_y)
+                print(train_loss)
+                train_loss.backward(retain_graph=True)
                 optimizer.step()
 
 
+            # NOTE: Recompute epsilon for scheduled sampling each epoch
+            epsilon = update_epsilon(epoch)
+            print("Linear decay applied. epsilon=%.2f" % epsilon)
 
-                print('Evaluating on dev set...')
-                dev_x = dev_seqs[:, 0:args.max_len-1]
-                dev_y = dev_seqs[:, 1:args.max_len]
-                # dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
-                # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
-                dev_y_tensor = torch.squeeze(torch.tensor(dev_y),0)
-                print("dev_x: " + str(dev_x.shape))
-                print("mb_y_tensor:  " + str(dev_y_tensor.shape))
 
-                dev_outputs = net.forward(dev_x, None)
-                print("dev_outputs: " + str(dev_outputs.shape))
-                dev_loss = loss(dev_outputs, dev_y_tensor)
+
+                #TODO 'Evaluating on dev set...'
+                # print('Evaluating on dev set...')
+                # dev_x = dev_seqs[:, 0:args.max_len-1]
+                # dev_y = dev_seqs[:, 1:args.max_len]
+                # # dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
+                # # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
+                # dev_y_tensor = torch.squeeze(torch.tensor(dev_y),0)
+                # print("dev_x: " + str(dev_x.shape))
+                # print("mb_y_tensor:  " + str(dev_y_tensor.shape))
+                #
+                # dev_outputs = net.forward(dev_x, None)
+                # print("dev_outputs: " + str(dev_outputs.shape))
+                # dev_loss = loss(dev_outputs, dev_y_tensor)
 
 
 
                 # Compute and print error metrics
-                dev_mape = 100 * np.sum(np.absolute(np.divide(np.subtract(dev_y, outputs), dev_y.mean()))) / dev_y.size
-                dev_mae = np.sum(np.absolute(np.subtract(dev_y, outputs))) / dev_y.size
-                dev_rmse = np.sqrt(dev_loss)
-
-                print(
-                "Epoch %d: dev_mse=%.10f dev_rmse=%.10f dev_mape=%.10f dev_mae=%.10f bad_count=%d"
-                % (epoch, my_dev_err, dev_rmse, dev_mape, dev_mae, bad_count))
-
-
-                bad_count += 1
-                if my_dev_err < best_dev_err:
-                    bad_count = 0
-                    best_dev_err = my_dev_err
-                # saver.save(sess, args.model) save model
-
-                if bad_count > args.patience:
-                    print('Converged due to early stopping...')
-                    break
-
-
-                # Reshape output for writing to netCDF
-                dev_outputs = dev_outputs.reshape(-1, 64, 128)
-                dev_y = dev_y.reshape(-1, 64, 128)
-                dev_time_y = dev_times[:, 1:args.max_len]
-                dev_time_y = dev_time_y.flatten()
-
-                # Denormalize output
-                if args.normalize == "log":
-                    dev_outputs = log_denormalize(dev_outputs)
-                    dev_y = log_denormalize(dev_y)
-                my_dev_err = compute_mse(dev_y, dev_outputs)
+                # dev_mape = 100 * np.sum(np.absolute(np.divide(np.subtract(dev_y, outputs), dev_y.mean()))) / dev_y.size
+                # dev_mae = np.sum(np.absolute(np.subtract(dev_y, outputs))) / dev_y.size
+                # dev_rmse = np.sqrt(dev_loss)
                 #
-                # # Exporting the predicted precipitation maps as well as the true maps, for visual comparison.
-                export_netCDF(dev_outputs, nc, args.dev_preds, dev_time_y)
-                export_netCDF(dev_y, nc, args.dev_truths, dev_time_y)
+                # print(
+                # "Epoch %d: dev_mse=%.10f dev_rmse=%.10f dev_mape=%.10f dev_mae=%.10f bad_count=%d"
+                # % (epoch, my_dev_err, dev_rmse, dev_mape, dev_mae, bad_count))
                 #
-                # # Reporting Mean Squared Error (MSE), Root Mean Squared Error (RMSE), Mean Absolute Percent Error (MAPE),
-                # # Mean Absolute Error.
-                dev_mape = 100 * np.sum(np.absolute(np.divide(np.subtract(dev_y, dev_outputs), dev_y.mean()))) / dev_y.size
-                dev_mae = np.sum(np.absolute(np.subtract(dev_y, dev_outputs))) / dev_y.size
-                dev_rmse = np.sqrt(my_dev_err)
-                print("After denormalization:\n dev_mse = %.10f\ndev_rmse = %.10f\ndev_mape = "
-                "%.10f\ndev_mae = %.10f" %
-                (my_dev_err, dev_rmse, dev_mape, dev_mae))
+                #
+                # bad_count += 1
+                # if my_dev_err < best_dev_err:
+                #     bad_count = 0
+                #     best_dev_err = my_dev_err
+                # # saver.save(sess, args.model) save model
+                #
+                # if bad_count > args.patience:
+                #     print('Converged due to early stopping...')
+                #     break
+                #
+                #
+                # # Reshape output for writing to netCDF
+                # dev_outputs = dev_outputs.reshape(-1, 64, 128)
+                # dev_y = dev_y.reshape(-1, 64, 128)
+                # dev_time_y = dev_times[:, 1:args.max_len]
+                # dev_time_y = dev_time_y.flatten()
+                #
+                # # Denormalize output
+                # if args.normalize == "log":
+                #     dev_outputs = log_denormalize(dev_outputs)
+                #     dev_y = log_denormalize(dev_y)
+                # my_dev_err = compute_mse(dev_y, dev_outputs)
+                # #
+                # # # Exporting the predicted precipitation maps as well as the true maps, for visual comparison.
+                # export_netCDF(dev_outputs, nc, args.dev_preds, dev_time_y)
+                # export_netCDF(dev_y, nc, args.dev_truths, dev_time_y)
+                # #
+                # # # Reporting Mean Squared Error (MSE), Root Mean Squared Error (RMSE), Mean Absolute Percent Error (MAPE),
+                # # # Mean Absolute Error.
+                # dev_mape = 100 * np.sum(np.absolute(np.divide(np.subtract(dev_y, dev_outputs), dev_y.mean()))) / dev_y.size
+                # dev_mae = np.sum(np.absolute(np.subtract(dev_y, dev_outputs))) / dev_y.size
+                # dev_rmse = np.sqrt(my_dev_err)
+                # print("After denormalization:\n dev_mse = %.10f\ndev_rmse = %.10f\ndev_mape = "
+                # "%.10f\ndev_mae = %.10f" %
+                # (my_dev_err, dev_rmse, dev_mape, dev_mae))
