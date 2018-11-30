@@ -50,6 +50,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
+            print(idx)
             train_seqs = train_seqs[idx]
             hidden_state = None
 
