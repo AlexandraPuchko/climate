@@ -30,6 +30,18 @@ def compute_decay_constants(epochs):
 
 
 
+def evaluateNet(net, loss, dev_x, dev_y, hidden_states):
+    #TODO: remove epsilon
+    epsilon = None
+    dev_outputs = net.forward(dev_x, hidden_states,epsilon,mode="eval")
+    dev_loss = loss(dev_outputs, dev_y)
+
+    return
+
+# def plotResults():
+
+
+
 def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
         print('Training started...')
@@ -52,7 +64,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             idx = np.random.permutation(num_seqs)
             print(idx)
             train_seqs = train_seqs[idx]
-            hidden_state = None
+            hidden_states = None
 
 
             #do first forward on a first sequence, then do k = len(sequence) shift
@@ -68,10 +80,10 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
                 # training
                 optimizer.zero_grad()
-                train_outputs, last_layer_hidden_states = net.forward(mb_x, hidden_state, epsilon)
+                train_outputs, prev_sequence_hidden_states = net.forward(mb_x, hidden_states, epsilon,mode="train")
 
                 #update hidden_state to next sequence
-                hidden_state = last_layer_hidden_states
+                hidden_states = prev_sequence_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.data)
@@ -83,14 +95,11 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-
-
-                #TODO 'Evaluating on dev set...'
-                # print('Evaluating on dev set...')
-                # dev_x = dev_seqs[:, 0:args.max_len-1]
-                # dev_y = dev_seqs[:, 1:args.max_len]
-                # # dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
-                # # dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
+            print('Evaluating on dev set...')
+            dev_x = dev_seqs[:, 0:args.max_len-1]
+            dev_y = dev_seqs[:, 1:args.max_len]
+            dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
+            dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
                 # dev_y_tensor = torch.squeeze(torch.tensor(dev_y),0)
                 # print("dev_x: " + str(dev_x.shape))
                 # print("mb_y_tensor:  " + str(dev_y_tensor.shape))

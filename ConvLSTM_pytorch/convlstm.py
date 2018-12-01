@@ -6,8 +6,8 @@ import pdb
 import logging
 
 
-# NOTE: These constants assume the model converges around epoch 100
-LIN_DECAY_CONST = (-1.0 / 20.0)
+# NOTE: These constants assume the model converges around epoch 50
+LIN_DECAY_CONST = (-1.0 / 50.0)
 
 
 #Static decay functions
@@ -137,7 +137,7 @@ class ConvLSTM(nn.Module):
         self.cell_list = nn.ModuleList(cell_list)
         self._hidden = self._init_hidden(1)
 
-    def forward(self, input_x, hidden_state, epsilon, is_t0=False):
+    def forward(self, input_x, hidden_state, epsilon, mode):
         """
 
         Parameters
@@ -190,11 +190,17 @@ class ConvLSTM(nn.Module):
             #      Flip biased coin, take ground truth with a probability of 'epsilon'
             #      ELSE take model output.
             #print("binomial: ", np.random.binomial(1, epsilon, 1)[0])
-            # if np.random.binomial(1, epsilon, 1)[0]:
-            #     train_x = cur_layer_input[:, t, :, :, :]
-            # else:
-            #     train_x = train_y
-            train_x = cur_layer_input[:, t, :, :, :]
+            if mode == "train":
+                if np.random.binomial(1, epsilon, 1)[0]:
+                    train_x = cur_layer_input[:, t, :, :, :]
+                else:
+                    train_x = train_y
+            elif mode == "eval":
+                if t == 0:
+                    train_x = cur_layer_input[:, t, :, :, :]
+                else:#TODO:change
+                    train_x = train_y
+
 
             for layer_idx in range(self.num_layers):
                 h, c = self.cell_list[layer_idx](input_tensor=train_x,

@@ -46,7 +46,7 @@ def parse_all_args():
      parser.add_argument("-epochs",
                          type=int,
                          help="The number of epochs to train for (an int) [default=20]",
-                         default=20)
+                         default=50)
      #
      #
     #  # Normalization Flags
@@ -197,7 +197,6 @@ def main():
     nc = n.Dataset(args.netcdf)
     time = nc.variables['time'][:]
     pr = nc.variables['pr'][:]
-
     channels = 1 #precipitation value
 
      #Load sequences
@@ -208,7 +207,7 @@ def main():
                             input_dim=channels,
                             hidden_dim=[2,4,4,8,8,32,32],
                             kernel_size=(3, 3),
-                            num_layers=7)
+                            num_layers=5)
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
     trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args);
