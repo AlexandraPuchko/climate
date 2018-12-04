@@ -15,6 +15,7 @@ class ConvLSTM(nn.Module):
         # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
         kernel_size = self._extend_for_multilayer(kernel_size, num_layers)
         hidden_dim  = self._extend_for_multilayer(hidden_dim, num_layers)
+
         if not len(kernel_size) == len(hidden_dim) == num_layers:
             raise ValueError('Inconsistent list length.')
 
@@ -42,7 +43,70 @@ class ConvLSTM(nn.Module):
         self.cell_list = nn.ModuleList(cell_list)
         self._hidden = self._init_hidden(1)
 
-    def forward(self, input_x, hidden_state, epsilon, is_t0=False):
+
+    def evaluate(self, input_x, hidden_states, step, seq_len):
+
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        input_x = input_x.float().to(device)
+
+        #hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
+        #contains  maps to input for each cell month by month
+        cur_layer_input = input_x
+
+        #from t = 0 to T
+        one_timestamp_output = []
+
+
+        #feed true image for the first timestamp, then feed only predicted
+        dev_x = cur_layer_input[:, step, :, :, :]
+        dev_y = dev_x
+
+        # save all predicted maps to compute the loss
+        eval_outputs = []
+        for t in range(step, seq_len):
+
+            for layer_idx in range(self.num_layers):
+                h, c = self.cell_list[layer_idx](input_tensor=dev_x,
+                                                 cur_state=hidden_states[layer_idx])
+                dev_x = h
+                one_timestamp_output.append([h, c])
+
+            # save all pairs (c_i, h_i) to feed the next timestep
+            hidden_states = one_timestamp_output
+            if t == step:
+                #save next_hidden state for step = step + 1
+                next_hidden_state = hidden_states
+
+            #get predicted value of h from the last layer for t = i
+            last_hidden_state = one_timestamp_output[-1][0]
+            in_channels_to_conv = last_hidden_state.size(1)
+            padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
+            conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
+                                  out_channels=1,# precipitation value
+                                  kernel_size=(3,3),
+                                  padding=padding_size,
+                                  bias=self.bias)
+
+            dev_y = conv_h(last_hidden_state)
+            eval_outputs.append(torch.squeeze(dev_y, 0))
+
+            #empty array of (h_i,c_i)
+            one_timestamp_output = []
+
+
+        #convert all outputs from the current sequence to tensor (stack along feature axes)
+        eval_outputs = torch.stack(eval_outputs,dim=0)
+        return eval_outputs, next_hidden_state
+
+
+
+
+
+
+
+
+
+    def forward(self, input_x, hidden_state, epsilon):
         """
 
         Parameters
@@ -65,8 +129,7 @@ class ConvLSTM(nn.Module):
         # else:
         #     input_tensor = input_tensor.permute(1, 0, 3, 4, 2)
 
-        input_x = torch.from_numpy(input_x)
-        #.float().to(device)
+        input_x = torch.from_numpy(input_x).float().to(device)
 
         if hidden_state is None:
             #TODO:learnable weights
@@ -74,7 +137,7 @@ class ConvLSTM(nn.Module):
         else:
             hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
 
-        ## of months in a sequence
+        # #of months in a sequence
         seq_len = input_x.size(1)
         #contains  maps to input for each cell month by month
         cur_layer_input = input_x
@@ -94,12 +157,10 @@ class ConvLSTM(nn.Module):
             #NOTE: This is where we use scheduled sampling to set up our next input.
             #      Flip biased coin, take ground truth with a probability of 'epsilon'
             #      ELSE take model output.
-            #print("binomial: ", np.random.binomial(1, epsilon, 1)[0])
             if np.random.binomial(1, epsilon, 1)[0]:
                 train_x = cur_layer_input[:, t, :, :, :]
             else:
                 train_x = train_y
-            train_x = cur_layer_input[:, t, :, :, :]
 
             for layer_idx in range(self.num_layers):
                 h, c = self.cell_list[layer_idx](input_tensor=train_x,

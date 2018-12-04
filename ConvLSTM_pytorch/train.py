@@ -6,7 +6,7 @@ import pdb
 import logging
 
 
-# NOTE: These constants assume the model converges around epoch 100
+# NOTE: These constants assume the model converges around epoch 20.0
 LIN_DECAY_CONST = (-1.0 / 20.0)
 
 
@@ -29,22 +29,78 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
-
-def evaluateNet(net, loss, dev_x, dev_y, hidden_states):
-    #TODO: remove epsilon
-    epsilon = None
-    dev_outputs = net.forward(dev_x, hidden_states,epsilon,mode="eval")
-    dev_loss = loss(dev_outputs, dev_y)
-
-    return
-
-# def plotResults():
+def plotMAE(seq_len, mae_arr):
+    plt.plot(seq_len,mae_arr)
+    plt.xlabel('Sequence length')
+    plt.ylabel('MAE')
+    plt.show()
 
 
 
-def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
+def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states):
+    print('Evaluating on dev set...')
+    #1) feed model with a hidden states from the training mode
+    #2) do pass through all data in a dev set
+    #seq_len = len(dev_x)
+    seq_len = dev_x.size(1)
+    print(dev_x.size())
+    print(seq_len)
+    next_hidden_state = prev_hidden_states
+    print(len(prev_hidden_states))
+
+    #create matrix of losses and first init all values to 0
+    losses = [[0 for x in range(seq_len)] for y in range(seq_len)]
+    mea_dev = []
+
+    for step in range(0, seq_len):
+        #get new hidden states on every pass through the sequence
+        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len)
+        dev_y = torch.squeeze(torch.tensor(dev_y),0)
+        current_dev = dev_y[step:]
+        step_loss = []
+        print("seq outputs len: %d"  % len(seq_outputs))
+        for t in range(len(seq_outputs)):
+            #compute loss for one datapoint in a sequence
+            running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
+            losses[step][t] = running_loss.data
+            print("loses[step][t]", losses[step][t])
+
+        #compute mae for a step
+        mea_dev.append(np.mean(losses[step]))
+    print(mea_dev)
+
+    return mea_dev
+
+
+
+
+def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=False):
 
         print('Training started...')
+
+        mb_row = 0
+        row_start = mb_row*args.mb
+        row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
+        dev_x = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
+        dev_y = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
+        print(dev_x.size(1))
+        print(dev_y.size(1))
+        #TODO: concatenate several dev_y to one
+        for mb_row in range(1, int(np.floor(len(dev_seqs) / args.mb))):
+            row_start = mb_row*args.mb
+            row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
+            dev_x_curr = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
+            dev_x = torch.cat((dev_x, dev_x_curr), 1)#concatenate across time
+            dev_y_curr = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
+            dev_y = torch.cat((dev_y, dev_y_curr), 1)
+
+        print(dev_x.size(1))
+        print(dev_y.size(1))
+        dev_y = torch.squeeze(torch.tensor(dev_y),0)
+
+
+
+
 
         best_dev_err = float('inf')
         bad_count = 0
@@ -62,7 +118,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
-            print(idx)
             train_seqs = train_seqs[idx]
             hidden_states = None
 
@@ -76,14 +131,14 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
 
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
-                mb_y= torch.squeeze(torch.tensor(mb_y),0)
+                mb_y = torch.squeeze(torch.tensor(mb_y),0)
 
                 # training
                 optimizer.zero_grad()
-                train_outputs, prev_sequence_hidden_states = net.forward(mb_x, hidden_states, epsilon,mode="train")
+                train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon)
 
                 #update hidden_state to next sequence
-                hidden_states = prev_sequence_hidden_states
+                hidden_states = prev_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.data)
@@ -95,30 +150,25 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args):
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            print('Evaluating on dev set...')
-            dev_x = dev_seqs[:, 0:args.max_len-1]
-            dev_y = dev_seqs[:, 1:args.max_len]
-            dev_h0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
-            dev_c0 = np.zeros(shape=(len(dev_y), 64, 128, 1), dtype=np.float32)
-                # dev_y_tensor = torch.squeeze(torch.tensor(dev_y),0)
-                # print("dev_x: " + str(dev_x.shape))
-                # print("mb_y_tensor:  " + str(dev_y_tensor.shape))
-                #
-                # dev_outputs = net.forward(dev_x, None)
-                # print("dev_outputs: " + str(dev_outputs.shape))
-                # dev_loss = loss(dev_outputs, dev_y_tensor)
+            # dev_x = []
+            # dev_y = []
+            # print(len(dev_seqs))
+            # for mb_row in range(int(np.floor(len(dev_seqs) / args.mb))):
+            #     row_start = mb_row*args.mb
+            #     row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
+            #     dev_x.extend(dev_seqs[row_start:row_end, 0:args.max_len-1])
+            #     dev_x.extend(dev_seqs[row_start:row_end, 1:args.max_len])
+            #
+            # dev_y = torch.squeeze(torch.tensor(dev_y),0)
+            #
+            # print("dev_x:", len(dev_x))
+            # print("dev_y:",len(dev_y))
 
+            dev_mae = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states)
 
-
-                # Compute and print error metrics
-                # dev_mape = 100 * np.sum(np.absolute(np.divide(np.subtract(dev_y, outputs), dev_y.mean()))) / dev_y.size
-                # dev_mae = np.sum(np.absolute(np.subtract(dev_y, outputs))) / dev_y.size
-                # dev_rmse = np.sqrt(dev_loss)
-                #
-                # print(
-                # "Epoch %d: dev_mse=%.10f dev_rmse=%.10f dev_mape=%.10f dev_mae=%.10f bad_count=%d"
-                # % (epoch, my_dev_err, dev_rmse, dev_mape, dev_mae, bad_count))
-                #
+            print("Epoch %d: dev_mae=%.10f"% (epoch,  dev_mae))
+            if plot:
+                plotMAE(len(dev_x), dev_mae)
                 #
                 # bad_count += 1
                 # if my_dev_err < best_dev_err:

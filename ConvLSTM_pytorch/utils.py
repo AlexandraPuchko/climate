@@ -5,7 +5,9 @@ import torch.nn as nn
 import torch
 import torch.optim as optim
 from convLSTM import ConvLSTM
+import matplotlib.pyplot as plt
 from train import trainNet
+
 
 
 
@@ -46,7 +48,7 @@ def parse_all_args():
      parser.add_argument("-epochs",
                          type=int,
                          help="The number of epochs to train for (an int) [default=20]",
-                         default=50)
+                         default=20)
      #
      #
     #  # Normalization Flags
@@ -110,9 +112,14 @@ def split_data(pr, nc_time, norm_type, max_len):
      train_seqs = inputs[0:train_len]
      train_times = times[0:train_len]
 
-     # dev (15%)
+     # dev (15%)-> concatenate all inputs into one long dev
      dev_ub = (train_len + dev_len)
      dev_seqs = inputs[train_len:dev_ub]
+    #  dev_merged = []
+    #  for i in range(0,len(dev_seqs)):
+    #      dev_merged.extend(dev_seqs[i])
+    #  dev_seqs = dev_merged
+
      dev_times = times[train_len:dev_ub]
 
      # test (15%)
@@ -188,6 +195,7 @@ def createLossAndOptimizer(net, learning_rate):
     return(loss, optimizer)
 
 
+
 def main():
 
     # parse arguments
@@ -207,10 +215,10 @@ def main():
                             input_dim=channels,
                             hidden_dim=[2,4,4,8,8,32,32],
                             kernel_size=(3, 3),
-                            num_layers=5)
+                            num_layers=7)
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args);
+    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=True);
 
 
 if __name__ == "__main__":
