@@ -61,9 +61,11 @@ class ConvLSTM(nn.Module):
         dev_x = cur_layer_input[:, step, :, :, :]
         dev_y = dev_x
 
+
         # save all predicted maps to compute the loss
         eval_outputs = []
         for t in range(step, seq_len):
+            dev_x = dev_y
 
             for layer_idx in range(self.num_layers):
                 h, c = self.cell_list[layer_idx](input_tensor=dev_x,
@@ -93,15 +95,9 @@ class ConvLSTM(nn.Module):
             #empty array of (h_i,c_i)
             one_timestamp_output = []
 
-
         #convert all outputs from the current sequence to tensor (stack along feature axes)
         eval_outputs = torch.stack(eval_outputs,dim=0)
         return eval_outputs, next_hidden_state
-
-
-
-
-
 
 
 
@@ -147,6 +143,8 @@ class ConvLSTM(nn.Module):
 
         #first assume train_x is a true input map and true_y is train_x
         train_x = cur_layer_input[:, 0, :, :, :]
+
+
         train_y = train_x
 
         #take hidden states for first layer

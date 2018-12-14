@@ -43,33 +43,42 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states):
     #2) do pass through all data in a dev set
     #seq_len = len(dev_x)
     seq_len = dev_x.size(1)
-    print(dev_x.size())
-    print(seq_len)
     next_hidden_state = prev_hidden_states
-    print(len(prev_hidden_states))
 
     #create matrix of losses and first init all values to 0
-    losses = [[0 for x in range(seq_len)] for y in range(seq_len)]
-    mea_dev = []
+    losses = [[-1 for x in range(seq_len)] for y in range(seq_len)]
+    mae = []
+    std = []
 
     for step in range(0, seq_len):
+        print("step: %d", step)
         #get new hidden states on every pass through the sequence
         seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len)
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
         current_dev = dev_y[step:]
-        step_loss = []
         print("seq outputs len: %d"  % len(seq_outputs))
+
         for t in range(len(seq_outputs)):
             #compute loss for one datapoint in a sequence
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
             losses[step][t] = running_loss.data
-            print("loses[step][t]", losses[step][t])
 
-        #compute mae for a step
-        mea_dev.append(np.mean(losses[step]))
-    print(mea_dev)
+    #compute mae
+    mae = []
+    sum = 0
+    for i in range(seq_len):
+        row = 0
+        while(losses[seq_len][row] != -1):
+            sum += losses[seq_len][row]
+            row+=1
+        #compute mean
+        mae.append(sum / (row - 1))
 
-    return mea_dev
+    #compute std
+    std = []
+    print(mae)
+
+    return mae, std
 
 
 
@@ -83,8 +92,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
         row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
         dev_x = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
         dev_y = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
-        print(dev_x.size(1))
-        print(dev_y.size(1))
         #TODO: concatenate several dev_y to one
         for mb_row in range(1, int(np.floor(len(dev_seqs) / args.mb))):
             row_start = mb_row*args.mb
@@ -94,11 +101,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
             dev_y_curr = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
             dev_y = torch.cat((dev_y, dev_y_curr), 1)
 
-        print(dev_x.size(1))
-        print(dev_y.size(1))
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
-
-
 
 
 
@@ -150,25 +153,12 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            # dev_x = []
-            # dev_y = []
-            # print(len(dev_seqs))
-            # for mb_row in range(int(np.floor(len(dev_seqs) / args.mb))):
-            #     row_start = mb_row*args.mb
-            #     row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
-            #     dev_x.extend(dev_seqs[row_start:row_end, 0:args.max_len-1])
-            #     dev_x.extend(dev_seqs[row_start:row_end, 1:args.max_len])
-            #
-            # dev_y = torch.squeeze(torch.tensor(dev_y),0)
-            #
-            # print("dev_x:", len(dev_x))
-            # print("dev_y:",len(dev_y))
-
-            dev_mae = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states)
-
-            print("Epoch %d: dev_mae=%.10f"% (epoch,  dev_mae))
+            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states)
+            #print std too
+            print("Epoch %d: dev_mae=%.10f"% (epoch,  mae))
             if plot:
-                plotMAE(len(dev_x), dev_mae)
+                plotMAE(len(dev_x), mae)
+
                 #
                 # bad_count += 1
                 # if my_dev_err < best_dev_err:
