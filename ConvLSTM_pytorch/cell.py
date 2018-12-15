@@ -44,6 +44,7 @@ class ConvLSTMCell(nn.Module):
 
         h_cur, c_cur = cur_state
 
+
         #apply convolution
         combined = torch.cat([input_tensor, h_cur,c_cur], dim=1) # concatenate along channel axis
         combined_conv = self.conv(combined)
@@ -61,9 +62,7 @@ class ConvLSTMCell(nn.Module):
 
     # (B*Cin*H*W)
     def init_hidden(self, batch_size):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         #init tensor with zeros
-        # return (Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).cuda(),
-        #         Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).cuda())
-
-        return (Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)),
-                Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)))
+        return (Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).to(device),
+                Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).to(device))

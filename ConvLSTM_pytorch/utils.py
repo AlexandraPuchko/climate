@@ -216,9 +216,13 @@ def main():
                             hidden_dim=[2,4,4,8,8,32,32],
                             kernel_size=(3, 3),
                             num_layers=7)
+    #use GPU
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    convLSTM = convLSTM.to(device)
+
 
     loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=True);
+    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=True);
 
 
 if __name__ == "__main__":

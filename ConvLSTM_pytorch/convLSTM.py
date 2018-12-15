@@ -44,9 +44,8 @@ class ConvLSTM(nn.Module):
         self._hidden = self._init_hidden(1)
 
 
-    def evaluate(self, input_x, hidden_states, step, seq_len):
+    def evaluate(self, input_x, hidden_states, step, seq_len, device):
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         input_x = input_x.float().to(device)
 
         #hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
@@ -83,12 +82,7 @@ class ConvLSTM(nn.Module):
             last_hidden_state = one_timestamp_output[-1][0]
             in_channels_to_conv = last_hidden_state.size(1)
             padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
-            conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
-                                  out_channels=1,# precipitation value
-                                  kernel_size=(3,3),
-                                  padding=padding_size,
-                                  bias=self.bias)
-
+            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
             dev_y = conv_h(last_hidden_state)
             eval_outputs.append(torch.squeeze(dev_y, 0))
 
@@ -102,7 +96,7 @@ class ConvLSTM(nn.Module):
 
 
 
-    def forward(self, input_x, hidden_state, epsilon):
+    def forward(self, input_x, hidden_state, epsilon, device):
         """
 
         Parameters
@@ -116,8 +110,6 @@ class ConvLSTM(nn.Module):
         -------
         train_y_vals, last_layer_hidden_states
         """
-        #use GPU
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
@@ -174,13 +166,12 @@ class ConvLSTM(nn.Module):
             last_hidden_state = one_timestamp_output[-1][0]
             in_channels_to_conv = last_hidden_state.size(1)
             padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
-            conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
-                                  out_channels=1,# precipitation value
-                                  kernel_size=(3,3),
-                                  padding=padding_size,
-                                  bias=self.bias)
+
+            #TODO think how to dynamically update weights to cuda
+            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
 
             train_y = conv_h(last_hidden_state)
+
             train_y_vals.append(torch.squeeze(train_y, 0))
             #empty array of (h_i,c_i)
             one_timestamp_output = []
@@ -189,6 +180,20 @@ class ConvLSTM(nn.Module):
         #convert all outputs from the current sequence to tensor (stack along feature axes)
         train_y_vals = torch.stack(train_y_vals,dim=0)
         return train_y_vals, last_layer_hidden_states
+
+
+
+    def dynamic_conv_h(self, in_channels_to_conv, padding_size, device):
+
+        conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
+                              out_channels=1,# precipitation value
+                              kernel_size=(3,3),
+                              padding=padding_size,
+                              bias=self.bias)
+        #use GPU
+        self.to(device)
+        return conv_h
+
 
 
     def _init_hidden(self, batch_size):

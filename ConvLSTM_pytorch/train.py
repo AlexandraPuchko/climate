@@ -37,7 +37,7 @@ def plotMAE(seq_len, mae_arr):
 
 
 
-def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states):
+def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     print('Evaluating on dev set...')
     #1) feed model with a hidden states from the training mode
     #2) do pass through all data in a dev set
@@ -53,7 +53,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states):
     for step in range(0, seq_len):
         print("step: %d", step)
         #get new hidden states on every pass through the sequence
-        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len)
+        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len, device)
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
         current_dev = dev_y[step:]
         print("seq outputs len: %d"  % len(seq_outputs))
@@ -83,7 +83,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states):
 
 
 
-def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=False):
+def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=False):
 
         print('Training started...')
 
@@ -91,14 +91,14 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
         row_start = mb_row*args.mb
         row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
         dev_x = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
-        dev_y = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
+        dev_y = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len]).to(device)
         #TODO: concatenate several dev_y to one
         for mb_row in range(1, int(np.floor(len(dev_seqs) / args.mb))):
             row_start = mb_row*args.mb
             row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
             dev_x_curr = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
             dev_x = torch.cat((dev_x, dev_x_curr), 1)#concatenate across time
-            dev_y_curr = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len])
+            dev_y_curr = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len]).to(device)
             dev_y = torch.cat((dev_y, dev_y_curr), 1)
 
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
@@ -134,11 +134,11 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
 
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
-                mb_y = torch.squeeze(torch.tensor(mb_y),0)
+                mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
 
                 # training
                 optimizer.zero_grad()
-                train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon)
+                train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon, device)
 
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
@@ -153,7 +153,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, plot=Fal
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states)
+            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
             #print std too
             print("Epoch %d: dev_mae=%.10f"% (epoch,  mae))
             if plot:
