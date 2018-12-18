@@ -115,13 +115,14 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         compute_decay_constants(args.epochs)
 
         for epoch in range(args.epochs):
-		
+            print("Epoch %d\n" % epoch)
+
 	    #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
             hidden_states = None
-	    
+
 
             #do first forward on a first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a new image
@@ -142,7 +143,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 hidden_states = prev_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
-                print("Epoch %d, Train loss = %.7f"% epoch, train_loss.data)
+                print("Train loss = %.7f" % train_loss.data)
                 train_loss.backward()
                 optimizer.step()
                 #
