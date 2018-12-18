@@ -115,15 +115,13 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         compute_decay_constants(args.epochs)
 
         for epoch in range(args.epochs):
-
-            print("Epoch: %d" % epoch)
-
-            #TODO: do not shuffle, do smth else
+		
+	    #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
             hidden_states = None
-
+	    
 
             #do first forward on a first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a new image
@@ -144,21 +142,9 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 hidden_states = prev_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
-                print("Train loss = %.7f" % train_loss.data)
+                print("Epoch %d, Train loss = %.7f"% epoch, train_loss.data)
                 train_loss.backward()
                 optimizer.step()
-
-
-            # NOTE: Recompute epsilon for scheduled sampling each epoch
-            epsilon = update_epsilon(epoch)
-            print("Linear decay applied. epsilon=%.5f" % epsilon)
-
-            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-            #print std too
-            print("Epoch %d: dev_mae=%.10f"% (epoch,  mae))
-            if plot:
-                plotMAE(len(dev_x), mae)
-
                 #
                 # bad_count += 1
                 # if my_dev_err < best_dev_err:
