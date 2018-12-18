@@ -213,12 +213,12 @@ def main():
     hidden_dim_param = [2,2,4,4,8,8,32,32]
     for layer in range(2, 10, 2):
 	print("Layer: %d\n", layer)
-        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param[0:layer],kernel_size=(3, 3),num_layers=layer)
-        #use GPU
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        convLSTM = convLSTM.to(device)
-        loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-        trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=True)
+	convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param[0:layer],kernel_size=(3, 3),num_layers=layer)
+	#use GPU
+	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+	convLSTM = convLSTM.to(device)
+	loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
+	trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=True)
 
 
 if __name__ == "__main__":
