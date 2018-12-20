@@ -29,10 +29,11 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
-def plotMAE(seq_len, mae_arr):
-    plt.plot(seq_len,mae_arr)
+def plotMAE(seq_len, mae_arr, std):
+    plt.plot(seq_len, mae_err, 'r--', seq_len, std, 'g^')
     plt.xlabel('Sequence length')
-    plt.ylabel('MAE')
+    plt.ylabel('Mean, Std')
+    plt.show()
     plt.show()
 
 
@@ -116,7 +117,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         compute_decay_constants(args.epochs)
 
         for epoch in range(args.epochs):
-            print("Epoch %d", epoch)
+            print("Epoch %d" % epoch)
 
 	    #TODO: do not shuffle, do smth else
             # shuffle data once per epoch
@@ -156,9 +157,8 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
 
                 mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
                 #print std too
-                print("Epoch %d: dev_mae=%.10f"% (epoch,  mae))
                 if plot:
-                    plotMAE(len(dev_x), mae)
+                    plotMAE(len(dev_x), mae, std)
 
                 #
                 # bad_count += 1
