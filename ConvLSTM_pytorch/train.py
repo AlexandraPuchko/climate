@@ -5,7 +5,6 @@ import numpy as np
 import pdb
 import logging
 import matplotlib
-matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 
 
