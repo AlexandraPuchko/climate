@@ -64,13 +64,15 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #compute mae
     mae = []
     sum = 0
-    for i in range(seq_len):
-        row = 0
-        while(losses[i][row] != -1):
-            sum += losses[i][row]
-            row+=1
-        #compute mean
-        mae.append(sum / (row - 1))
+
+    for col in range(seq_len):
+        for row in range(seq_len):
+            if losses[row][col] != -1:
+                sum += losses[i][col]
+            else:
+                break
+            #compute mean
+        mae.append(sum / row)
 
     #compute std
     std = []
