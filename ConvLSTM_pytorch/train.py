@@ -151,15 +151,17 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
 
 
 
-                # NOTE: Recompute epsilon for scheduled sampling each epoch
-                epsilon = update_epsilon(epoch)
-                print("Linear decay applied. epsilon=%.5f" % epsilon)
+            # NOTE: Recompute epsilon for scheduled sampling each epoch (check it out, evaulate on dev set each epoch?)
+            epsilon = update_epsilon(epoch)
+            print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-                mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-                x_axes = [0 for i in range(0, dev_x.size(1))]
-                #print std too
-                if plot:
-                    plotMAE(x_axes, mae, std)
+            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
+            x_axes = [0 for i in range(0, dev_x.size(1))]
+            print("MAE")
+            print(mae)
+            #print std too
+            if plot:
+                plotMAE(x_axes, mae, std)
 
                 #
                 # bad_count += 1
