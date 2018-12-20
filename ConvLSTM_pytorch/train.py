@@ -62,7 +62,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
         for t in range(len(seq_outputs)):
             #compute loss for one datapoint in a sequence
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
-            losses[step][t] = running_loss.data.item(0)
+            losses[step][t] = running_loss.item()
 
     #compute mean and std
     mae = []
@@ -147,7 +147,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 hidden_states = prev_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
-                print("Train loss = %.7f, Year: %d" % (train_loss.data.item(0), (mb_row + 1)))
+                print("Train loss = %.7f, Year: %d" % (train_loss.item(), (mb_row + 1)))
                 train_loss.backward()
                 optimizer.step()
 
