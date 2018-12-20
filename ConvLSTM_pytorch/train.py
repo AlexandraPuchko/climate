@@ -156,13 +156,10 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 print("Linear decay applied. epsilon=%.5f" % epsilon)
 
                 mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-                print(dev_x.size(0))
-                print(dev_x.size(1))
-                print(len(mae))
-                print(len(std))
+                x_axes = [0 for i in range(0, dev_x.size(1))]
                 #print std too
                 if plot:
-                    plotMAE(dev_x.size(1), mae, std)
+                    plotMAE(x_axes, mae, std)
 
                 #
                 # bad_count += 1
