@@ -51,12 +51,10 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     std = []
 
     for step in range(0, seq_len):
-        print("step: %d", step)
         #get new hidden states on every pass through the sequence
         seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len, device)
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
         current_dev = dev_y[step:]
-        print("seq outputs len: %d"  % len(seq_outputs))
 
         for t in range(len(seq_outputs)):
             #compute loss for one datapoint in a sequence
@@ -68,15 +66,15 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     sum = 0
     for i in range(seq_len):
         row = 0
-        while(losses[seq_len][row] != -1):
-            sum += losses[seq_len][row]
+        while(losses[i][row] != -1):
+            sum += losses[i][row]
             row+=1
         #compute mean
         mae.append(sum / (row - 1))
 
     #compute std
     std = []
-    print(mae)
+    print("MAE %d " % mae)
 
     return mae, std
 
