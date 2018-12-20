@@ -61,23 +61,23 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
             losses[step][t] = running_loss.data
 
-    #compute mae
+    #compute mean and std
     mae = []
-    sum = 0
+    std = []
 
     for col in range(seq_len):
+        curr_std = []
+        sum = 0
         for row in range(seq_len):
             if losses[row][col] != -1:
+                curr_std.append(losses[row][col])
                 sum += losses[row][col]
             else:
                 break
-            #compute mean
-        mae.append(sum / row)
 
-    #compute std
-    std = []
-    print("MAE")
-    print(mae)
+        mae.append(sum / row)
+        std.append(np.std(np.array(curr_std), axis = 0))
+
 
     return mae, std
 
