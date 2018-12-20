@@ -147,7 +147,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 hidden_states = prev_hidden_states
 
                 train_loss = loss(train_outputs, mb_y)
-                print("Train loss = %.7f, Year: %d" % (train_loss.item(), (mb_row + 1)))
+                print("Train loss = %.7f, Year %d" % (train_loss.item(), (mb_row + 1)))
                 train_loss.backward()
                 optimizer.step()
 
