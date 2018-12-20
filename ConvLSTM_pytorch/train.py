@@ -76,7 +76,8 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
 
     #compute std
     std = []
-    print("MAE %d " % mae)
+    print("MAE")
+    print(mae)
 
     return mae, std
 
