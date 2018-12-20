@@ -4,7 +4,10 @@ import torch
 import numpy as np
 import pdb
 import logging
+import matplotlib
+matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
+
 
 
 # NOTE: These constants assume the model converges around epoch 20.0
