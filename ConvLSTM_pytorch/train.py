@@ -68,7 +68,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     for col in range(seq_len):
         for row in range(seq_len):
             if losses[row][col] != -1:
-                sum += losses[i][col]
+                sum += losses[row][col]
             else:
                 break
             #compute mean
