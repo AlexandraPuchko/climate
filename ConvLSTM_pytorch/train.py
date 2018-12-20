@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pdb
 import logging
+import matplotlib.pyplot as plt
 
 
 # NOTE: These constants assume the model converges around epoch 20.0
@@ -33,7 +34,6 @@ def plotMAE(seq_len, mae_arr, std):
     plt.plot(seq_len, mae_err, 'r--', seq_len, std, 'g^')
     plt.xlabel('Sequence length')
     plt.ylabel('Mean, Std')
-    plt.show()
     plt.show()
 
 
