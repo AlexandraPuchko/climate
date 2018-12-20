@@ -30,8 +30,8 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
-def plotMAE(seq_len, mae_arr, std):
-    plt.plot(seq_len, mae_err, 'r--', seq_len, std, 'g^')
+def plotMAE(seq_len, mae, std):
+    plt.plot(seq_len, mae, 'r--', seq_len, std, 'g^')
     plt.xlabel('Sequence length')
     plt.ylabel('Mean, Std')
     plt.show()
