@@ -7,6 +7,7 @@ import torch.optim as optim
 from convLSTM import ConvLSTM
 import matplotlib.pyplot as plt
 from train import trainNet
+import chocolate as choco
 
 
 
@@ -207,11 +208,34 @@ def main():
     pr = nc.variables['pr'][:]
     channels = 1 #precipitation value
 
+    # # Define the conditional search space  for tuning
+    # space = [
+    #     {"condition": 1, "x": choco.uniform(low=1, high=10)},
+    #     {"condition": 2, "y": choco.log(low=-2, high=2, base=10)}
+    # ]
+    # # Establish a connection to a SQLite local database
+    # conn = choco.SQLiteConnection("sqlite:///my_db.db")
+    #
+    # # Construct the optimizer
+    # sampler = choco.Bayes(conn, space)
+    #
+    # # Sample the next point
+    # token, params = sampler.next()
+    #
+    # # Calculate the loss for the sampled point (minimized)
+    # loss = objective_function(**params)
+    #
+    # # Add the loss to the database
+    # sampler.update(token, loss)
+
      #Load sequences
+
+
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
-    hidden_dim_param = [2,2,4,4,8,8,32,32]
-    for layer in range(2, 11, 2):
+    hidden_dim_param = [2,2,4,4,8,8,32,32] #ask brian about it
+    for layer in range(2,4,2):
+    # for layer in range(2, 11, 2):
         print("Layer: %d" % layer)
         convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param[0:layer],kernel_size=(3, 3),num_layers=layer)
         #use GPU

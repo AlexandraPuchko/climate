@@ -32,11 +32,12 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
-def plotMAE(seq_len, mae, std):
+def plotMAE(seq_len, mae, std, epoch):
     plt.plot(seq_len, mae, 'r--', seq_len, std, 'g^')
     plt.xlabel('Sequence length')
     plt.ylabel('Mean, Std')
-    plt.show()
+    plt.show(hold=False)
+    plt.savefig('train' + epoch + '.png')
 
 
 
@@ -163,7 +164,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             print("Std: \n", std)
             #print std too
             if plot:
-                plotMAE(x_axes, mae, std)
+                plotMAE(x_axes, mae, std, epoch)
 
                 #
                 # bad_count += 1
