@@ -33,13 +33,14 @@ def compute_decay_constants(epochs):
 
 
 def plotMAE(seq_len, mae, std, epoch):
-    plt.plot(seq_len, mae, 'r') # plotting t, a separately
-    plt.plot(seq_len, std, 'b')
-    plt.xlabel('Sequence length')
-    plt.ylabel('Mean, Std')
-    # plt.show(hold=False)
-    plt.savefig('train' + str(epoch) + '.png')
-    print("Image of std and eman is saved!")
+    if epoch == 0 or epoch == 10 or epoch == 20:
+        plt.plot(seq_len, mae, 'r') # plotting t, a separately
+        plt.plot(seq_len, std, 'b')
+        plt.xlabel('Sequence length')
+        plt.ylabel('Mean (red), Std (blue)')
+        # plt.show(hold=False)
+        plt.savefig('train' + str(epoch) + '.png')
+        print("Image of std and eman is saved!")
 
 
 
