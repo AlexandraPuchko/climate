@@ -35,8 +35,10 @@ def compute_decay_constants(epochs):
 def plotMAE(seq_len, mae, std, epoch):
     if epoch == 0 or epoch == 10 or epoch == 20:
 
-        plt.plot(seq_len, mae + std,'b',alpha=0.5)
-        plt.plot(seq_len, mae - std,'b',alpha=0.5)
+        std_upper = mae[i] += std[i] for i in range(len(mae))
+        std_lower = mae[i] -= std[i] for i in range(len(mae))
+        plt.plot(seq_len, std_upper,'b',alpha=0.5)
+        plt.plot(seq_len, std_lower,'b',alpha=0.5)
         plt.fill_between(x, mae + std, mae - std, 'b', alpha = 0.1)
         plt.plot(seq_len, mae, 'r') # plotting t, a separately
         plt.xlabel('Years')
