@@ -36,8 +36,9 @@ def plotMAE(seq_len, mae, std, epoch):
     plt.plot(seq_len, mae, 'r--', seq_len, std, 'g^')
     plt.xlabel('Sequence length')
     plt.ylabel('Mean, Std')
-    plt.show(hold=False)
+    # plt.show(hold=False)
     plt.savefig('train' + epoch + '.png')
+    print("Image of std and eman is saved!")
 
 
 
