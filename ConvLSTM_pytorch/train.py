@@ -34,10 +34,13 @@ def compute_decay_constants(epochs):
 
 def plotMAE(seq_len, mae, std, epoch):
     if epoch == 0 or epoch == 10 or epoch == 20:
+
+        plt.plot(seq_len, mae + std,'b',alpha=0.5)
+        plt.plot(seq_len, mae - std,'b',alpha=0.5)
+        plt.fill_between(x, mae + std, mae - std, 'b', alpha = 0.1)
         plt.plot(seq_len, mae, 'r') # plotting t, a separately
-        plt.plot(seq_len, std, 'b')
-        plt.xlabel('Sequence length')
-        plt.ylabel('Mean (red), Std (blue)')
+        plt.xlabel('Years')
+        plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
         # plt.show(hold=False)
         plt.savefig('train' + str(epoch) + '.png')
         print("Image of std and eman is saved!")
@@ -162,7 +165,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
             mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-            x_axes = [i for i in range(0, dev_x.size(1))]
+            x_axes = [i for i in range(0, (dev_x.size(1) // 12))]
             # print("MAE : \n", mae)
             # print("Std: \n", std)
             #print std too
