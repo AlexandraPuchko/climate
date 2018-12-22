@@ -37,9 +37,9 @@ def plotMAE(seq_len, mae, std, epoch):
         std_upper = []
         std_lower = []
         for i in range(len(mae)):
-            std_upper[i] = mae[i] + std[i]
+            std_upper.append(mae[i] + std[i])
         for i in range(len(mae)):
-            std_lower[i] = mae[i] - std[i]
+            std_lower.append(mae[i] - std[i])
 
         plt.plot(seq_len, std_upper,'b',alpha=0.5)
         plt.plot(seq_len, std_lower,'b',alpha=0.5)
