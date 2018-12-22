@@ -43,7 +43,7 @@ def plotMAE(seq_len, mae, std, epoch):
 
         plt.plot(seq_len, std_upper,'b',alpha=0.5)
         plt.plot(seq_len, std_lower,'b',alpha=0.5)
-        plt.fill_between(seq_len, mae + std, mae - std, 'b', alpha = 0.1)
+        plt.fill_between(seq_len, std_upper, std_lower, 'b', alpha = 0.1)
         plt.plot(seq_len, mae, 'r') # plotting t, a separately
         plt.xlabel('Years')
         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
