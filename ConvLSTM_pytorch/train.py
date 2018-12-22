@@ -33,7 +33,8 @@ def compute_decay_constants(epochs):
 
 
 def plotMAE(seq_len, mae, std, epoch):
-    plt.plot(seq_len, mae, 'r--', seq_len, std, 'g^')
+    plt.plot(seq_len, mae, 'r') # plotting t, a separately
+    plt.plot(seq_len, std, 'b')
     plt.xlabel('Sequence length')
     plt.ylabel('Mean, Std')
     # plt.show(hold=False)
