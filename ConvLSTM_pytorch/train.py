@@ -32,23 +32,24 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
-def plotMAE(seq_len, mae, std, epoch):
-    if epoch == 0 or epoch == 10 or epoch == 20:
-        std_upper = []
-        std_lower = []
-        for i in range(len(mae)):
-            std_upper.append(mae[i] + std[i])
-        for i in range(len(mae)):
-            std_lower.append(mae[i] - std[i])
+def plotMAE(seq_len, mae, std, epoch, layer):
+    if epoch == 0 or epoch == 10 or epoch == 19:
+        mae = np.array(mae)
+        std = np.array(std)
+        std_upper = mae + std
+        std_lower = mae - std
+        # for i in range(len(mae)):
+        #     std_upper.append(mae[i] + std[i])
+        # for i in range(len(mae)):
+        #     std_lower.append(mae[i] - std[i])
 
-        plt.plot(seq_len, std_upper,'b',alpha=0.5)
-        plt.plot(seq_len, std_lower,'b',alpha=0.5)
-        plt.plot(seq_len, mae, 'r') # plotting t, a separately
-        plt.xlabel('Years')
+        plt.plot(seq_len, std_upper,'b',alpha=0.3)
+        plt.plot(seq_len, std_lower,'b',alpha=0.3)
+        plt.plot(seq_len, mae, 'r', alpha=0.5) # plotting t, a separately
+        plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
+        plt.xlabel('Months')
         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
-        # plt.show(hold=False)
-        plt.savefig('train' + str(epoch) + '.png')
-        print("Image of std and eman is saved!")
+        plt.savefig('train' + str(layer) + "_" + str(epoch) + '.png')
 
 
 
@@ -175,7 +176,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             # print("Std: \n", std)
             #print std too
             if plot:
-                plotMAE(x_axes, mae, std, epoch)
+                plotMAE(x_axes, mae, std, epoch, net.num_layers)
 
                 #
                 # bad_count += 1

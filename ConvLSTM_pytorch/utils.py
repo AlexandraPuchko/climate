@@ -234,7 +234,7 @@ def main():
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
     hidden_dim_param = [2,2,4,4,8,8,32,32] #ask brian about it
-    for layer in range(2,4,2):
+    for layer in range(2,21,2):
     # for layer in range(2, 11, 2):
         print("Layer: %d" % layer)
         convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param[0:layer],kernel_size=(3, 3),num_layers=layer)
