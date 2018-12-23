@@ -43,9 +43,9 @@ def plotMAE(seq_len, mae, std, epoch, layer):
         # for i in range(len(mae)):
         #     std_lower.append(mae[i] - std[i])
 
-        plt.plot(seq_len, std_upper,'b',alpha=0.3)
-        plt.plot(seq_len, std_lower,'b',alpha=0.3)
-        plt.plot(seq_len, mae, 'r', alpha=0.5) # plotting t, a separately
+        plt.plot(seq_len, std_upper,'b',linestyle=':',alpha=0.3)
+        plt.plot(seq_len, std_lower,'b',linestyle=':',alpha=0.3)
+        plt.plot(seq_len, mae, 'r',linestyle=':', alpha=0.5) # plotting t, a separately
         plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
         plt.xlabel('Months')
         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
