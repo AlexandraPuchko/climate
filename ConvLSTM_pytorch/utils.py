@@ -233,7 +233,7 @@ def main():
 
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
-    hidden_dim_param = [2,2,4,4,8,8,32,32] #TODO: ask brian about it
+    hidden_dim_param = [2,2,4,4,8,8,32,32] #TODO: ask Brian
     for layer in range(2,21,2):
     # for layer in range(2, 11, 2):
         print("Layer: %d" % layer)
