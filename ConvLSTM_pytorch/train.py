@@ -76,11 +76,8 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
             #compute loss for one datapoint in a sequence
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
             losses[step][t] = running_loss.item()
-
-    #compute mean and std
     mae = []
-    std = []
-
+    # std = []
     for col in range(seq_len):
         curr_std = []
         sum = 0
@@ -92,10 +89,9 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
                 break
 
         mae.append(sum / row)
-        std.append(np.std(np.array(curr_std), axis = 0))
+        # std.append(np.std(np.array(curr_std), axis = 0))
 
-
-    return mae, std
+    return mae
 
 
 
@@ -121,7 +117,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         dev_y = torch.squeeze(torch.tensor(dev_y),0)
 
 
-
+        model_state = {}
         best_dev_err = float('inf')
         bad_count = 0
         num_seqs = len(train_seqs)
@@ -130,6 +126,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         #for scheduled sampling
         epsilon = 1.0
         compute_decay_constants(args.epochs)
+        hidden_states = None
 
         for epoch in range(args.epochs):
             print("Epoch %d" % epoch)
@@ -138,7 +135,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
-            hidden_states = None
+            # hidden_states = None
 
 
             #do first forward on a first sequence, then do k = len(sequence) shift
@@ -170,24 +167,24 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            mae, std = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
+            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
             x_axes = [i for i in range(0, dev_x.size(1))]
-            # print("MAE : \n", mae)
-            # print("Std: \n", std)
-            #print std too
+
             if plot:
                 plotMAE(x_axes, mae, std, epoch, net.num_layers)
 
+
+            bad_count += 1
+            if curr_dev_err < best_dev_err:
+                bad_count = 0
+                best_dev_err = curr_dev_err
+                model_state = model.state_dict() #save model
+                torch.save(model.state_dict(), "model")
+                # saver.save(sess, args.model) save model
                 #
-                # bad_count += 1
-                # if my_dev_err < best_dev_err:
-                #     bad_count = 0
-                #     best_dev_err = my_dev_err
-                # # saver.save(sess, args.model) save model
-                #
-                # if bad_count > args.patience:
-                #     print('Converged due to early stopping...')
-                #     break
+            if bad_count > args.patience:
+                print('Converged due to early stopping...')
+                break
                 #
                 #
                 # # Reshape output for writing to netCDF

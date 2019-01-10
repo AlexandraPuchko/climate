@@ -242,7 +242,7 @@ def main():
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         convLSTM = convLSTM.to(device)
         loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-        trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=True)
+        trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=False)
 
 
 if __name__ == "__main__":
