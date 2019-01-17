@@ -240,7 +240,6 @@ def main():
     print('Finished loading and splitting data.')
 
     layer, hidden_dim_param, epochs = generate_params()
-    print(layer, hidden_dim_param, epochs)
 
     convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
     #use GPU

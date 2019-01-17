@@ -55,6 +55,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #1) feed model with a hidden states from the training mode
     #2) do pass through all data in a dev set
     seq_len = dev_x.size(1)
+    print(seq_len)
     next_hidden_state = prev_hidden_states
 
     #create matrix of losses and first init all values to 0
