@@ -1,4 +1,4 @@
-uimport torch.nn as nn
+import torch.nn as nn
 from torch.autograd import Variable
 import torch
 import numpy as np
@@ -50,7 +50,7 @@ def showPlot(dev_size, mae, std, epoch, layer):
 
 
 
-def evaluateNet(net, dev_x, dev_y, prev_hidden_states, device):
+def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     print('Evaluating on dev set...')
     #1) feed model with a hidden states from the training mode
     #2) do pass through all data in a dev set
@@ -78,7 +78,8 @@ def evaluateNet(net, dev_x, dev_y, prev_hidden_states, device):
             if losses[row][col] != -1:
                 sum += losses[row][col]
             else:
-        dev_loss += sum
+                break
+            dev_loss += sum
 
     return dev_loss
 
@@ -154,7 +155,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            curr_dev_err = evaluateNet(net, dev_x, dev_y, prev_hidden_states, device)
+            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
             print(curr_dev_err)
 
             if plot:
