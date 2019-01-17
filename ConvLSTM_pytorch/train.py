@@ -1,4 +1,4 @@
-import torch.nn as nn
+uimport torch.nn as nn
 from torch.autograd import Variable
 import torch
 import numpy as np
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 
-# NOTE: These constants assume the model converges around epoch 20.0
+# NOTE: These constants assume the model converges around epoch 20.0 (default value)
 LIN_DECAY_CONST = (-1.0 / 20.0)
 
 
@@ -50,7 +50,7 @@ def showPlot(dev_size, mae, std, epoch, layer):
 
 
 
-def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
+def evaluateNet(net, dev_x, dev_y, prev_hidden_states, device):
     print('Evaluating on dev set...')
     #1) feed model with a hidden states from the training mode
     #2) do pass through all data in a dev set
@@ -60,11 +60,9 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #create matrix of losses and first init all values to 0
     losses = [[-1 for x in range(seq_len)] for y in range(seq_len)]
 
-    mae = std = []
-
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
-        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step,seq_len, device)
+        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step, seq_len, device)
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
         current_dev = dev_y[step:]
 
@@ -72,25 +70,22 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
             #compute loss for one datapoint in a sequence
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
             losses[step][t] = running_loss.item()
-    mae = []
+
+    dev_loss = 0
     for col in range(seq_len):
-        curr_std = []
         sum = 0
         for row in range(seq_len):
             if losses[row][col] != -1:
-                curr_std.append(losses[row][col])
                 sum += losses[row][col]
             else:
-                break
+        dev_loss += sum
 
-        mae.append(sum / row)
-
-    return mae
+    return dev_loss
 
 
 
 
-def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=False):
+def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
 
         print('Training started...')
 
@@ -129,7 +124,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
-            # hidden_states = None
 
 
             # First forward is done on the first sequence, then do k = len(sequence) shift
@@ -160,22 +154,21 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-            x_axes = [i for i in range(0, dev_x.size(1))]
-
+            curr_dev_err = evaluateNet(net, dev_x, dev_y, prev_hidden_states, device)
+            print(curr_dev_err)
 
             if plot:
                 showPlot(dev_x.size(1), mae, std, epoch, net.num_layers)
 
+            bad_count += 1 #save model configuration and Error
 
-            bad_count += 1
             if curr_dev_err < best_dev_err:
+                print(curr_dev_err, best_dev_err)
+                print(model.state_dict())
                 bad_count = 0
                 best_dev_err = curr_dev_err
-                model_state = model.state_dict() #save model
+
                 torch.save(model.state_dict(), "model")
-                # saver.save(sess, args.model) save model
-                #
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
                 break

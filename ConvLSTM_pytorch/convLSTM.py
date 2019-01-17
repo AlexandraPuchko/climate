@@ -47,8 +47,6 @@ class ConvLSTM(nn.Module):
     def evaluate(self, input_x, hidden_states, step, seq_len, device):
 
         input_x = input_x.float().to(device)
-
-        #hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
         #contains  maps to input for each cell month by month
         cur_layer_input = input_x
 

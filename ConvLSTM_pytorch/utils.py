@@ -8,6 +8,7 @@ from convLSTM import ConvLSTM
 import matplotlib.pyplot as plt
 from train import trainNet
 import chocolate as choco
+import random
 
 
 
@@ -50,9 +51,6 @@ def parse_all_args():
                          type=int,
                          help="The number of epochs to train for (an int) [default=20]",
                          default=20)
-     #
-     #
-    #  # Normalization Flags
      parser.add_argument("-normalize",
                          type=str,
                          choices=["log"],
@@ -195,6 +193,25 @@ def createLossAndOptimizer(net, learning_rate):
     optimizer = optim.SGD(net.parameters(), learning_rate)
     return(loss, optimizer)
 
+def generate_params():
+    layer = random.randint(2, 21)
+    epoch = random.randint(50, 150)
+    hidden_dim_param = []
+    start_pow = random.choice([1, 2, 3, 4])#do not include 32 for start, otherwise
+                                           # all of the values in the sequence will have to be 32
+    end_pow = 5
+    hidden_dim_param.append(2 ** start_pow)
+
+    # randomly generate increasing sequence of hidden_dim size
+    # based on the value of layer
+    for i in range(layer - 1):
+        rand_pow = random.randint(start_pow, end_pow)
+        start_pow = rand_pow
+        hidden_dim_param.append(2 ** rand_pow)
+
+
+    return layer, hidden_dim_param, epoch
+
 
 
 def main():
@@ -208,45 +225,29 @@ def main():
     pr = nc.variables['pr'][:]
     channels = 1 #precipitation value
 
-    # # Define the conditional search space  for tuning
-    # space = [
-    #     {"condition": 1, "x": choco.uniform(low=1, high=10)},
-    #     {"condition": 2, "y": choco.log(low=-2, high=2, base=10)}
-    # ]
-    # # Establish a connection to a SQLite local database
-    # conn = choco.SQLiteConnection("sqlite:///my_db.db")
-    #
-    # # Construct the optimizer
-    # sampler = choco.Bayes(conn, space)
-    #
-    # # Sample the next point
-    # token, params = sampler.next()
-    #
-    # # Calculate the loss for the sampled point (minimized)
-    # loss = objective_function(**params)
-    #
-    # # Add the loss to the database
-    # sampler.update(token, loss)
 
-     #Load sequences
+    '''
+    Hyper-parameters:
+    -arg.patience : 10
+    -hidden_dim_param[2,4,8,16,32]
+    -num of layers[2:20]
+    -num of epochs[50-150]
+    '''
 
 
+    #Load sequences
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
-    hidden_dim_param = [2,2,4,4,8,8,32,32] #TODO: ask Brian
-    for layer in range(2,21,2):
-    # for layer in range(2, 11, 2):
-        print("Layer: %d" % layer)
-        convLSTM = ConvLSTM(input_size=(64, 128),
-                            input_dim=channels,
-                            hidden_dim=hidden_dim_param[0:layer],
-                            kernel_size=(3, 3),
-                            num_layers=layer)
-        #use GPU
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        convLSTM = convLSTM.to(device)
-        loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-        trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, plot=False)
+
+    layer, hidden_dim_param, epochs = generate_params()
+    print(layer, hidden_dim_param, epochs)
+
+    convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
+    #use GPU
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    convLSTM = convLSTM.to(device)
+    loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
+    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
 
 
 if __name__ == "__main__":
