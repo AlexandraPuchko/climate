@@ -61,6 +61,7 @@ class ConvLSTM(nn.Module):
 
         # save all predicted maps to compute the loss
         eval_outputs = []
+        # print(seq_len)
         for t in range(step, seq_len):
             dev_x = dev_y
 
@@ -112,13 +113,10 @@ class ConvLSTM(nn.Module):
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
             input_x = input_tensor.permute(1, 0, 2, 3, 4)
-        # else:
-        #     input_tensor = input_tensor.permute(1, 0, 3, 4, 2)
 
         input_x = torch.from_numpy(input_x).float().to(device)
 
         if hidden_state is None:
-            #TODO:learnable weights
             hidden_state = self._hidden
         else:
             hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
@@ -165,9 +163,8 @@ class ConvLSTM(nn.Module):
             in_channels_to_conv = last_hidden_state.size(1)
             padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
 
-            #TODO think how to dynamically update weights to cuda
-            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
 
+            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
             train_y = conv_h(last_hidden_state)
 
             train_y_vals.append(torch.squeeze(train_y, 0))

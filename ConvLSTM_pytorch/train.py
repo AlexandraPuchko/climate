@@ -53,34 +53,26 @@ def showPlot(dev_size, mae, std, epoch, layer):
 def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     print('Evaluating on dev set...')
     #1) feed model with a hidden states from the training mode
-    #2) do pass through all data in a dev set
+    #2) do pass through all the data in a dev set
     seq_len = dev_x.size(1)
-    print(seq_len)
     next_hidden_state = prev_hidden_states
 
     #create matrix of losses and first init all values to 0
-    losses = [[-1 for x in range(seq_len)] for y in range(seq_len)]
+    losses = np.zeros((seq_len, seq_len))
 
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
         seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step, seq_len, device)
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
         current_dev = dev_y[step:]
-
         for t in range(len(seq_outputs)):
             #compute loss for one datapoint in a sequence
             running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
-            losses[step][t] = running_loss.item()
+            losses[step,t] = running_loss.item()
 
     dev_loss = 0
-    for col in range(seq_len):
-        sum = 0
-        for row in range(seq_len):
-            if losses[row][col] != -1:
-                sum += losses[row][col]
-            else:
-                break
-            dev_loss += sum
+    for row in range(seq_len):
+        dev_loss += np.sum(losses[row])
 
     return dev_loss
 
@@ -122,8 +114,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         for epoch in range(args.epochs):
             print("Epoch %d" % epoch)
 
-	        #TODO: do not shuffle data in epoch, do smth else
-            # shuffle data once per epoch
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
 
@@ -157,7 +147,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
             curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
-            print(curr_dev_err)
+            print("Dev error=%.7f" % curr_dev_err)
 
             if plot:
                 showPlot(dev_x.size(1), mae, std, epoch, net.num_layers)
