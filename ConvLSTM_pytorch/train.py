@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 # NOTE: These constants assume the model converges around epoch 20.0 (default value)
 LIN_DECAY_CONST = (-1.0 / 20.0)
+file_name = "log.csv"
 
 
 #Static decay functions
@@ -58,21 +59,26 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     next_hidden_state = prev_hidden_states
 
     #create matrix of losses and first init all values to 0
-    losses = np.zeros((seq_len, seq_len))
+    losses = np.zeros(seq_len)
 
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
         seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step, seq_len, device)
+
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
         current_dev = dev_y[step:]
-        for t in range(len(seq_outputs)):
-            #compute loss for one datapoint in a sequence
-            running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
-            losses[step,t] = running_loss.item()
+        running_loss = loss(seq_outputs, current_dev).item()
+        losses[step] = running_loss
+        # for t in range(len(seq_outputs)):
+        #     #compute loss for one datapoint in a sequence
+        #     running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
+        #     losses[step,t] = running_loss.item()
 
-    dev_loss = 0
-    for row in range(seq_len):
-        dev_loss += np.sum(losses[row])
+
+    # dev_loss = 0
+    # for row in range(seq_len):
+    #     dev_loss += np.sum(losses[row])
+    dev_loss = np.sum(losses)
 
     return dev_loss
 
@@ -121,6 +127,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             # First forward is done on the first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a sequence
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
+                print(int(np.floor(num_seqs / args.mb)))
                 row_start = mb_row*args.mb
                 row_end = np.min([(mb_row+1)*args.mb, num_seqs]) # Last minibatch might be partial
 
@@ -129,14 +136,15 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
                 mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
 
-                # training
-                optimizer.zero_grad()
+
                 train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon, device)
 
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.item())
+                # training
+                optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
 
@@ -146,7 +154,14 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device)
+
+            net.cpu()
+            dev_y = dev_y.cpu()
+            dev_x = dev_x.cpu()
+            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cpu")
+            #TODO: convert previous hidden states
+            net.cuda()
+
             print("Dev error=%.7f" % curr_dev_err)
 
             if plot:
@@ -155,12 +170,16 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             bad_count += 1 #save model configuration and Error
 
             if curr_dev_err < best_dev_err:
-                print(curr_dev_err, best_dev_err)
-                print(model.state_dict())
                 bad_count = 0
                 best_dev_err = curr_dev_err
+                net.save_state_dict('model.pt')
 
-                torch.save(model.state_dict(), "model")
+                #write to a file
+                f = open(file_name, "a")
+
+                hidden_dim_ls = ', '.join(net.hidden_dim)
+                f.write("epochs: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, net.num_layers, hidden_dim_ls, current_dev_err))
+
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
                 break

@@ -195,6 +195,7 @@ def createLossAndOptimizer(net, learning_rate):
 
 def generate_params():
     layer = random.randint(2, 21)
+    layer = 2
     epoch = random.randint(50, 150)
     hidden_dim_param = []
     start_pow = random.choice([1, 2, 3, 4])#do not include 32 for start, otherwise

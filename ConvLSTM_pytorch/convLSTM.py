@@ -6,7 +6,7 @@ from cell import ConvLSTMCell
 
 class ConvLSTM(nn.Module):
 
-    def __init__(self, input_size, input_dim, hidden_dim, kernel_size, num_layers,
+    def __init__(self,input_size, input_dim, hidden_dim, kernel_size, num_layers,
                  batch_first=True, bias=True, return_all_layers=False):
         super(ConvLSTM, self).__init__()
 
@@ -66,8 +66,11 @@ class ConvLSTM(nn.Module):
             dev_x = dev_y
 
             for layer_idx in range(self.num_layers):
+                hidden_states[layer_idx][0] = hidden_states[layer_idx][0].cpu()
+                hidden_states[layer_idx][1] = hidden_states[layer_idx][1].cpu()
                 h, c = self.cell_list[layer_idx](input_tensor=dev_x,
                                                  cur_state=hidden_states[layer_idx])
+
                 dev_x = h
                 one_timestamp_output.append([h, c])
 
