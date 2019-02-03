@@ -6,6 +6,7 @@ import pdb
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
+import time
 
 
 
@@ -88,6 +89,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
 def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
 
         print('Training started...')
+        train_start_time = time.time()
 
         mb_row = 0
         row_start = mb_row*args.mb
@@ -118,6 +120,8 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         hidden_states = None
 
         for epoch in range(args.epochs):
+
+            start_time = time.time()
             print("Epoch %d" % epoch)
 
             idx = np.random.permutation(num_seqs)
@@ -127,7 +131,6 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             # First forward is done on the first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a sequence
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
-                print(int(np.floor(num_seqs / args.mb)))
                 row_start = mb_row*args.mb
                 row_end = np.min([(mb_row+1)*args.mb, num_seqs]) # Last minibatch might be partial
 
@@ -142,7 +145,7 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
-                print("Train loss = %.7f" % train_loss.item())
+                print("Train loss = %.7f " % train_loss.item())
                 # training
                 optimizer.zero_grad()
                 train_loss.backward()
@@ -155,14 +158,15 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
 
-            net.cpu()
-            dev_y = dev_y.cpu()
-            dev_x = dev_x.cpu()
-            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cpu")
+            net = net.cpu()
+            next_states = prev_hidden_states
+            curr_dev_err = evaluateNet(net, loss, dev_x.cpu(), dev_y.cpu(), next_states, "cpu")
+            device = "cuda"
             #TODO: convert previous hidden states
-            net.cuda()
+            net = net.cuda()
+            time_elapsed = (time.time() - start_time) // 60
 
-            print("Dev error=%.7f" % curr_dev_err)
+            print("Dev error=%.7f, time elapsed: %d sec" % (curr_dev_err, time_elapsed))
 
             if plot:
                 showPlot(dev_x.size(1), mae, std, epoch, net.num_layers)
@@ -172,17 +176,22 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             if curr_dev_err < best_dev_err:
                 bad_count = 0
                 best_dev_err = curr_dev_err
-                net.save_state_dict('model.pt')
+                torch.save(net.state_dict(), 'model.pt')
 
                 #write to a file
                 f = open(file_name, "a")
 
-                hidden_dim_ls = ', '.join(net.hidden_dim)
-                f.write("epochs: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, net.num_layers, hidden_dim_ls, current_dev_err))
+                hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
+                f.write("epochs: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, net.num_layers, hidden_dim_ls, curr_dev_err))
 
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
                 break
+
+
+        print('Training finished...')
+        train_end_time = (time.time() - train_start_time) // 60
+        print('Time elapsed...%d sec' % train_end_time)
                 #
                 #
                 # # Reshape output for writing to netCDF

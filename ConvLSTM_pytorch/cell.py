@@ -46,7 +46,12 @@ class ConvLSTMCell(nn.Module):
 
 
         #apply convolution
+        if input_tensor.type != h_cur.type and input_tensor.is_cuda:
+            h_cur = h_cur.cuda()
+            c_cur = c_cur.cuda()
+
         combined = torch.cat([input_tensor, h_cur,c_cur], dim=1) # concatenate along channel axis
+
         combined_conv = self.conv(combined)
 
         #split along channel axis

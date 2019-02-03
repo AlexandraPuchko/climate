@@ -119,6 +119,7 @@ class ConvLSTM(nn.Module):
 
         input_x = torch.from_numpy(input_x).float().to(device)
 
+
         if hidden_state is None:
             hidden_state = self._hidden
         else:
