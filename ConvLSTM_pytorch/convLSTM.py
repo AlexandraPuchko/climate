@@ -38,6 +38,13 @@ class ConvLSTM(nn.Module):
                                           hidden_dim=self.hidden_dim[i],
                                           kernel_size=self.kernel_size[i],
                                           bias=self.bias))
+        #last conv layer
+        padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
+        cell_list.append(nn.Conv2d(in_channels=hidden_dim[-1],
+                              out_channels=1,# precipitation value
+                              kernel_size=(3,3),
+                              padding=1,
+                              bias=self.bias))
         #module list is like a Python list. It is similar to forward, but forward has its embedded forward method,
         # whereas we should redefine our own in ModuleList
         self.cell_list = nn.ModuleList(cell_list)
@@ -61,7 +68,7 @@ class ConvLSTM(nn.Module):
 
         # save all predicted maps to compute the loss
         eval_outputs = []
-        # print(seq_len)
+
         for t in range(step, seq_len):
             dev_x = dev_y
 
@@ -82,10 +89,8 @@ class ConvLSTM(nn.Module):
 
             #get predicted value of h from the last layer for t = i
             last_hidden_state = one_timestamp_output[-1][0]
-            in_channels_to_conv = last_hidden_state.size(1)
-            padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
-            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
-            dev_y = conv_h(last_hidden_state)
+            #apply convolution on top of all layers
+            dev_y = self.cell_list[-1](last_hidden_state)
             eval_outputs.append(torch.squeeze(dev_y, 0))
 
             #empty array of (h_i,c_i)
@@ -164,12 +169,7 @@ class ConvLSTM(nn.Module):
 
             #get predicted value of h from the last layer for t = i
             last_hidden_state = one_timestamp_output[-1][0]
-            in_channels_to_conv = last_hidden_state.size(1)
-            padding_size = self.kernel_size[0][0] // 2, self.kernel_size[0][1] // 2
-
-
-            conv_h = self.dynamic_conv_h(in_channels_to_conv, padding_size, device).to(device)
-            train_y = conv_h(last_hidden_state)
+            train_y = self.cell_list[-1](last_hidden_state)
 
             train_y_vals.append(torch.squeeze(train_y, 0))
             #empty array of (h_i,c_i)
@@ -180,18 +180,6 @@ class ConvLSTM(nn.Module):
         train_y_vals = torch.stack(train_y_vals,dim=0)
         return train_y_vals, last_layer_hidden_states
 
-
-
-    def dynamic_conv_h(self, in_channels_to_conv, padding_size, device):
-
-        conv_h = nn.Conv2d(in_channels=in_channels_to_conv,
-                              out_channels=1,# precipitation value
-                              kernel_size=(3,3),
-                              padding=padding_size,
-                              bias=self.bias)
-        #use GPU
-        self.to(device)
-        return conv_h
 
 
 

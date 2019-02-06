@@ -194,15 +194,14 @@ def createLossAndOptimizer(net, learning_rate):
     return(loss, optimizer)
 
 def generate_params():
-    layer = random.randint(2, 21)
-    layer = 2
+    layer = random.randint(2, 30)
     epoch = random.randint(50, 150)
     hidden_dim_param = []
     start_pow = random.choice([1, 2, 3, 4])#do not include 32 for start, otherwise
                                            # all of the values in the sequence will have to be 32
     end_pow = 5
     hidden_dim_param.append(2 ** start_pow)
-
+    layer = 4
     # randomly generate increasing sequence of hidden_dim size
     # based on the value of layer
     for i in range(layer - 1):
@@ -240,14 +239,18 @@ def main():
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
 
-    layer, hidden_dim_param, epochs = generate_params()
+    #run 50 experiments
+    for exp_id in range(0, 50):
+        layer, hidden_dim_param, epochs = generate_params()
+        print(layer, hidden_dim_param, epochs)
 
-    convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
-    #use GPU
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    convLSTM = convLSTM.to(device)
-    loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-    trainNet(convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
+        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
+        #use GPU
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print(device)
+        convLSTM = convLSTM.to(device)
+        loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
+        trainNet(exp_id, convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
 
 
 if __name__ == "__main__":

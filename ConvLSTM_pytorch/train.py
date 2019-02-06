@@ -65,6 +65,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
         seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step, seq_len, device)
+        print(step)
 
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
         current_dev = dev_y[step:]
@@ -86,7 +87,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
 
 
 
-def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
+def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
 
         print('Training started...')
         train_start_time = time.time()
@@ -120,14 +121,12 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
         hidden_states = None
 
         for epoch in range(args.epochs):
-
-            start_time = time.time()
             print("Epoch %d" % epoch)
 
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
 
-
+            net.train()
             # First forward is done on the first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a sequence
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
@@ -138,14 +137,12 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
                 mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
-
-
                 train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon, device)
 
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
-                print("Train loss = %.7f " % train_loss.item())
+                print("Train loss = %.7f" % train_loss.item())
                 # training
                 optimizer.zero_grad()
                 train_loss.backward()
@@ -157,16 +154,17 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
-
-            net = net.cpu()
-            next_states = prev_hidden_states
-            curr_dev_err = evaluateNet(net, loss, dev_x.cpu(), dev_y.cpu(), next_states, "cpu")
-            device = "cuda"
-            #TODO: convert previous hidden states
-            net = net.cuda()
+            net.eval()
+            net.cpu()
+            dev_y = dev_y.cpu()
+            dev_x = dev_x.cpu()
+            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cpu")
+            net.cuda()
             time_elapsed = (time.time() - start_time) // 60
 
-            print("Dev error=%.7f, time elapsed: %d sec" % (curr_dev_err, time_elapsed))
+
+            hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
+            print("exp_id = %d, dev error = %.7f, epoch = %d, layers = %d, hidden_dim_ls = %s" % (exp_id, curr_dev_err, epoch, net.num_layers, hidden_dim_ls))
 
             if plot:
                 showPlot(dev_x.size(1), mae, std, epoch, net.num_layers)
@@ -181,12 +179,13 @@ def trainNet(net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, 
                 #write to a file
                 f = open(file_name, "a")
 
-                hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
-                f.write("epochs: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, net.num_layers, hidden_dim_ls, curr_dev_err))
+
+                f.write("epochs: %d, epoch: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, epoch, net.num_layers, hidden_dim_ls, current_dev_err))
 
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
                 break
+
 
 
         print('Training finished...')
