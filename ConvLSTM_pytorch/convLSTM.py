@@ -51,7 +51,7 @@ class ConvLSTM(nn.Module):
         self._hidden = self._init_hidden(1)
 
 
-    def evaluate(self, input_x, hidden_states, step, seq_len, device):
+    def evaluate(self, loss, input_x, hidden_states, step, seq_len, current_dev, device):
 
         input_x = input_x.float().to(device)
         #contains  maps to input for each cell month by month
@@ -67,14 +67,17 @@ class ConvLSTM(nn.Module):
 
 
         # save all predicted maps to compute the loss
-        eval_outputs = []
+        step_loss = 0
 
         for t in range(step, seq_len):
             dev_x = dev_y
 
             for layer_idx in range(self.num_layers):
-                hidden_states[layer_idx][0] = hidden_states[layer_idx][0].cpu()
-                hidden_states[layer_idx][1] = hidden_states[layer_idx][1].cpu()
+
+
+                hidden_states[layer_idx][0] = hidden_states[layer_idx][0].cpu().detach()
+                hidden_states[layer_idx][1] = hidden_states[layer_idx][1].cpu().detach()
+
                 h, c = self.cell_list[layer_idx](input_tensor=dev_x,
                                                  cur_state=hidden_states[layer_idx])
 
@@ -91,14 +94,12 @@ class ConvLSTM(nn.Module):
             last_hidden_state = one_timestamp_output[-1][0]
             #apply convolution on top of all layers
             dev_y = self.cell_list[-1](last_hidden_state)
-            eval_outputs.append(torch.squeeze(dev_y, 0))
+            step_loss += loss(torch.squeeze(dev_y, 0), current_dev[t,:,:,:]).item()
 
             #empty array of (h_i,c_i)
             one_timestamp_output = []
 
-        #convert all outputs from the current sequence to tensor (stack along feature axes)
-        eval_outputs = torch.stack(eval_outputs,dim=0)
-        return eval_outputs, next_hidden_state
+        return step_loss, next_hidden_state
 
 
 

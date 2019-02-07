@@ -45,7 +45,7 @@ class ConvLSTMCell(nn.Module):
         h_cur, c_cur = cur_state
 
 
-        #apply convolution
+        # #apply convolution
         if input_tensor.type != h_cur.type and input_tensor.is_cuda:
             h_cur = h_cur.cuda()
             c_cur = c_cur.cuda()

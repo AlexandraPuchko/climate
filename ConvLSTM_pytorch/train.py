@@ -53,34 +53,33 @@ def showPlot(dev_size, mae, std, epoch, layer):
 
 
 def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
-    print('Evaluating on dev set...')
+
+
+
+    seq_len = dev_x.size(1)
+    print('Evaluating on dev set... (%d precipitation maps)' % seq_len)
     #1) feed model with a hidden states from the training mode
     #2) do pass through all the data in a dev set
-    seq_len = dev_x.size(1)
+
     next_hidden_state = prev_hidden_states
+    #create matrix of losses and first init all values to 0cl
+    dev_loss = 0
 
-    #create matrix of losses and first init all values to 0
-    losses = np.zeros(seq_len)
-
+    # for step in range(seq_len):
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
-        seq_outputs, next_hidden_state = net.evaluate(dev_x, next_hidden_state, step, seq_len, device)
-        print(step)
-
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
-        current_dev = dev_y[step:]
-        running_loss = loss(seq_outputs, current_dev).item()
-        losses[step] = running_loss
-        # for t in range(len(seq_outputs)):
-        #     #compute loss for one datapoint in a sequence
-        #     running_loss = loss(seq_outputs[t], current_dev[t,:,:,:])
-        #     losses[step,t] = running_loss.item()
+        # net.cpu()
+        # dev_y = dev_y.cpu()
+        # dev_x = dev_x.cpu()
+        step_loss, next_hidden_state = net.evaluate(loss, dev_x, next_hidden_state, step, seq_len, dev_y, "cuda:0")
 
 
-    # dev_loss = 0
-    # for row in range(seq_len):
-    #     dev_loss += np.sum(losses[row])
-    dev_loss = np.sum(losses)
+        print('Step %d loss = %.7f' % (step, step_loss))
+        dev_loss += step_loss
+
+
+    # net.cuda()
 
     return dev_loss
 
@@ -89,7 +88,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
 
 def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
 
-        print('Training started...')
+        print('Training started...Exp_id = %d' % exp_id)
         train_start_time = time.time()
 
         mb_row = 0
@@ -137,8 +136,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
                 mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
-                train_outputs, prev_hidden_states = net.forward(mb_x, hidden_states, epsilon, device)
-
+                train_outputs, prev_hidden_states = net(mb_x, hidden_states, epsilon, device)
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
@@ -155,12 +153,8 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
             net.eval()
-            net.cpu()
-            dev_y = dev_y.cpu()
-            dev_x = dev_x.cpu()
-            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cpu")
-            net.cuda()
-            time_elapsed = (time.time() - start_time) // 60
+            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
+            # time_elapsed = (time.time() - start_time) // 60
 
 
             hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
@@ -180,7 +174,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
                 f = open(file_name, "a")
 
 
-                f.write("epochs: %d, epoch: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, epoch, net.num_layers, hidden_dim_ls, current_dev_err))
+                f.write("epochs: %d, epoch: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, epoch, net.num_layers, hidden_dim_ls, curr_dev_err))
 
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
