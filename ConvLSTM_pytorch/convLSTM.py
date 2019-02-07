@@ -50,7 +50,7 @@ class ConvLSTM(nn.Module):
         self.cell_list = nn.ModuleList(cell_list)
         self._hidden = self._init_hidden(1)
 
-
+    @profile
     def evaluate(self, loss, input_x, hidden_states, step, seq_len, current_dev, device):
 
         input_x = input_x.float().to(device)
@@ -103,7 +103,7 @@ class ConvLSTM(nn.Module):
 
 
 
-
+    @profile
     def forward(self, input_x, hidden_state, epsilon, device):
         """
 
