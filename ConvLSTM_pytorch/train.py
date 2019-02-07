@@ -65,7 +65,6 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #create matrix of losses and first init all values to 0cl
     dev_loss = 0
 
-    # for step in range(seq_len):
     for step in range(seq_len):
         #get new hidden states on every pass through the sequence
         dev_y = torch.squeeze(torch.tensor(dev_y), 0)
