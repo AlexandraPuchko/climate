@@ -72,22 +72,17 @@ class ConvLSTM(nn.Module):
             input_x = input_tensor.permute(1, 0, 2, 3, 4)
 
         input_x = torch.from_numpy(input_x).float().to(device)
+
         #depending on the forward mode, we either output loss (if Validation) or train_outputs (if Train)
         mode_output = None
+
         if forward_mode == 'Train':
             if hidden_state is None:
                 hidden_state = self._hidden
             else:
                 hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
-
             # #of months in a sequence
-            seq_len = input_x.size(1)
-        elif forward_mode == 'Validation':
-            hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
-            #for validation slice the input_x from step,
-            # since on every step we are adding one more ground truth
-            #sort of to warm up the model
-            seq_len = input_x.size(1) - step
+        seq_len = input_x.size(1)
 
         cur_layer_input = input_x
         train_x = cur_layer_input[:, 0, :, :, :]
@@ -99,6 +94,7 @@ class ConvLSTM(nn.Module):
         hidden_states = hidden_state
         # save all predicted maps to compute the loss
         train_y_vals = []
+
         forward_loss = 0
         last_layer_hidden_states = None
 
@@ -123,13 +119,11 @@ class ConvLSTM(nn.Module):
 
             # save all pairs (c_i, h_i) to feed the next timestep
             hidden_states = one_timestamp_output
-
-
-            #get predicted value of h from the last layer for t = i
-            last_hidden_state = one_timestamp_output[-1][0]
-            train_y = self.cell_list[-1](last_hidden_state)
             #empty array of (h_i,c_i)
             one_timestamp_output = []
+            #get predicted value of h from the last layer for t = i
+            last_hidden_state = hidden_states[-1][0]
+            train_y = self.cell_list[-1](last_hidden_state)
 
             #either append the image, or compute the loss
             if forward_mode == 'Train':
@@ -140,9 +134,8 @@ class ConvLSTM(nn.Module):
             elif forward_mode == 'Validation':
                 forward_loss += loss(torch.squeeze(train_y, 0), dev_y[t]).item()
                 if t == 0:
-                    #save hidden states from the last ground truth fitted value
-                    # and then use this value as an initial state in the next
-                    # sequence
+                    #save hidden states from the first ground truth fitted value
+                    # and use it as an initial state in the next sequence
                     last_layer_hidden_states = hidden_states
 
 

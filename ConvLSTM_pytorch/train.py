@@ -61,19 +61,16 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #1) feed model with a hidden states from the training mode
     #2) do pass through all the data in a dev set
 
-    # next_hidden_state = prev_hidden_states
     hidden_states = prev_hidden_states
-    #create matrix of losses and first init all values to 0cl
     dev_loss = 0
     #get new hidden states on every pass through the sequence
     dev_y = torch.squeeze(torch.tensor(dev_y), 0)
+
     for step in range(seq_len):
         epsilon = 0#validation
-        step_loss, prev_hidden_states = net(dev_x[:,step:], hidden_states, epsilon, device, 'Validation', loss, step, dev_y[step:])
-        hidden_states = prev_hidden_states
+        step_loss, hidden_states = net(dev_x[:,step:], hidden_states, epsilon, device, 'Validation', loss, step, dev_y[step:])
         print('Step %d loss = %.10f' % (step, step_loss))
         dev_loss += step_loss
-
 
     return dev_loss
 
@@ -121,7 +118,6 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
             idx = np.random.permutation(num_seqs)
             train_seqs = train_seqs[idx]
 
-            net.train()
             # First forward is done on the first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a sequence
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
@@ -145,12 +141,14 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
 
 
 
-            # NOTE: Recompute epsilon for scheduled sampling each epoch
+
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
             net.eval()
-            curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
+            with torch.no_grad():
+                curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
+            net.train()
 
 
 
