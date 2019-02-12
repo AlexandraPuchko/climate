@@ -56,29 +56,24 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
 
 
 
-    seq_len = dev_x.size(1)
+    seq_len = dev_x.shape[1]
     print('Evaluating on dev set... (%d precipitation maps)' % seq_len)
     #1) feed model with a hidden states from the training mode
     #2) do pass through all the data in a dev set
 
-    next_hidden_state = prev_hidden_states
+    # next_hidden_state = prev_hidden_states
+    hidden_states = prev_hidden_states
     #create matrix of losses and first init all values to 0cl
     dev_loss = 0
-
+    #get new hidden states on every pass through the sequence
+    dev_y = torch.squeeze(torch.tensor(dev_y), 0)
     for step in range(seq_len):
-        #get new hidden states on every pass through the sequence
-        dev_y = torch.squeeze(torch.tensor(dev_y), 0)
-        # net.cpu()
-        # dev_y = dev_y.cpu()
-        # dev_x = dev_x.cpu()
-        step_loss, next_hidden_state = net.evaluate(loss, dev_x, next_hidden_state, step, seq_len, dev_y, "cuda:0")
-
-
-        print('Step %d loss = %.7f' % (step, step_loss))
+        epsilon = 0#validation
+        step_loss, prev_hidden_states = net(dev_x[:,step:], hidden_states, epsilon, device, 'Validation', loss, step, dev_y[step:])
+        hidden_states = prev_hidden_states
+        print('Step %d loss = %.10f' % (step, step_loss))
         dev_loss += step_loss
 
-
-    # net.cuda()
 
     return dev_loss
 
@@ -90,6 +85,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         print('Training started...Exp_id = %d' % exp_id)
         train_start_time = time.time()
 
+
         mb_row = 0
         row_start = mb_row*args.mb
         row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
@@ -99,12 +95,13 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         for mb_row in range(1, int(np.floor(len(dev_seqs) / args.mb))):
             row_start = mb_row*args.mb
             row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
-            dev_x_curr = torch.from_numpy(dev_seqs[row_start:row_end, 0:args.max_len-1])
-            dev_x = torch.cat((dev_x, dev_x_curr), 1)#concatenate across time
-            dev_y_curr = torch.from_numpy(dev_seqs[row_start:row_end, 1:args.max_len]).to(device)
-            dev_y = torch.cat((dev_y, dev_y_curr), 1)
+            dev_x_curr = dev_seqs[row_start:row_end, 0:args.max_len-1]
+            dev_x = np.concatenate((dev_x, dev_x_curr), axis=1) #concatenate across time
+            dev_y_curr = dev_seqs[row_start:row_end, 1:args.max_len]
+            dev_y = np.concatenate((dev_y, dev_y_curr), axis=1) #concatenate across time
 
-        dev_y = torch.squeeze(torch.tensor(dev_y),0)
+        dev_y = torch.squeeze(torch.tensor(dev_y),0).to(device)
+
 
 
         model_state = {}
@@ -135,7 +132,8 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
                 mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
-                train_outputs, prev_hidden_states = net(mb_x, hidden_states, epsilon, device)
+                #think what to do with loss
+                train_outputs, prev_hidden_states = net(mb_x, hidden_states, epsilon,device,'Train',None, 0, None)
                 #update hidden_state to next sequence
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
@@ -153,7 +151,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
 
             net.eval()
             curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
-            # time_elapsed = (time.time() - start_time) // 60
+
 
 
             hidden_dim_ls = ', '.join(map(str, net.hidden_dim))

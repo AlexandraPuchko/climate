@@ -50,61 +50,9 @@ class ConvLSTM(nn.Module):
         self.cell_list = nn.ModuleList(cell_list)
         self._hidden = self._init_hidden(1)
 
-    @profile
-    def evaluate(self, loss, input_x, hidden_states, step, seq_len, current_dev, device):
 
-        input_x = input_x.float().to(device)
-        #contains  maps to input for each cell month by month
-        cur_layer_input = input_x
-
-        #from t = 0 to T
-        one_timestamp_output = []
-
-
-        #feed true image for the first timestamp, then feed only predicted
-        dev_x = cur_layer_input[:, step, :, :, :]
-        dev_y = dev_x
-
-
-        # save all predicted maps to compute the loss
-        step_loss = 0
-
-        for t in range(step, seq_len):
-            dev_x = dev_y
-
-            for layer_idx in range(self.num_layers):
-
-
-                hidden_states[layer_idx][0] = hidden_states[layer_idx][0].cpu().detach()
-                hidden_states[layer_idx][1] = hidden_states[layer_idx][1].cpu().detach()
-
-                h, c = self.cell_list[layer_idx](input_tensor=dev_x,
-                                                 cur_state=hidden_states[layer_idx])
-
-                dev_x = h
-                one_timestamp_output.append([h, c])
-
-            # save all pairs (c_i, h_i) to feed the next timestep
-            hidden_states = one_timestamp_output
-            if t == step:
-                #save next_hidden state for step = step + 1
-                next_hidden_state = hidden_states
-
-            #get predicted value of h from the last layer for t = i
-            last_hidden_state = one_timestamp_output[-1][0]
-            #apply convolution on top of all layers
-            dev_y = self.cell_list[-1](last_hidden_state)
-            step_loss += loss(torch.squeeze(dev_y, 0), current_dev[t,:,:,:]).item()
-
-            #empty array of (h_i,c_i)
-            one_timestamp_output = []
-
-        return step_loss, next_hidden_state
-
-
-
-    @profile
-    def forward(self, input_x, hidden_state, epsilon, device):
+    #@profile
+    def forward(self, input_x, hidden_state, epsilon, device, forward_mode,loss, step, dev_y):
         """
 
         Parameters
@@ -118,45 +66,54 @@ class ConvLSTM(nn.Module):
         -------
         train_y_vals, last_layer_hidden_states
         """
-
+        seq_len = 0
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
             input_x = input_tensor.permute(1, 0, 2, 3, 4)
 
         input_x = torch.from_numpy(input_x).float().to(device)
+        #depending on the forward mode, we either output loss (if Validation) or train_outputs (if Train)
+        mode_output = None
+        if forward_mode == 'Train':
+            if hidden_state is None:
+                hidden_state = self._hidden
+            else:
+                hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
 
-
-        if hidden_state is None:
-            hidden_state = self._hidden
-        else:
+            # #of months in a sequence
+            seq_len = input_x.size(1)
+        elif forward_mode == 'Validation':
             hidden_state = [(h.detach(),c.detach()) for h,c in hidden_state]
+            #for validation slice the input_x from step,
+            # since on every step we are adding one more ground truth
+            #sort of to warm up the model
+            seq_len = input_x.size(1) - step
 
-        # #of months in a sequence
-        seq_len = input_x.size(1)
-        #contains  maps to input for each cell month by month
         cur_layer_input = input_x
+        train_x = cur_layer_input[:, 0, :, :, :]
+        train_y = train_x
 
         #from t = 0 to T
         one_timestamp_output = []
-
-        #first assume train_x is a true input map and true_y is train_x
-        train_x = cur_layer_input[:, 0, :, :, :]
-
-
-        train_y = train_x
-
         #take hidden states for first layer
         hidden_states = hidden_state
         # save all predicted maps to compute the loss
         train_y_vals = []
+        forward_loss = 0
+        last_layer_hidden_states = None
+
         for t in range(seq_len):
             #NOTE: This is where we use scheduled sampling to set up our next input.
             #      Flip biased coin, take ground truth with a probability of 'epsilon'
             #      ELSE take model output.
-            if np.random.binomial(1, epsilon, 1)[0]:
-                train_x = cur_layer_input[:, t, :, :, :]
-            else:
+            if forward_mode == 'Train':
+                if np.random.binomial(1, epsilon, 1)[0]:
+                    train_x = cur_layer_input[:, t, :, :, :]
+                else:
+                    train_x = train_y
+            elif forward_mode == 'Validation':
                 train_x = train_y
+
 
             for layer_idx in range(self.num_layers):
                 h, c = self.cell_list[layer_idx](input_tensor=train_x,
@@ -171,15 +128,32 @@ class ConvLSTM(nn.Module):
             #get predicted value of h from the last layer for t = i
             last_hidden_state = one_timestamp_output[-1][0]
             train_y = self.cell_list[-1](last_hidden_state)
-
-            train_y_vals.append(torch.squeeze(train_y, 0))
             #empty array of (h_i,c_i)
             one_timestamp_output = []
-            last_layer_hidden_states = hidden_states
 
-        #convert all outputs from the current sequence to tensor (stack along feature axes)
-        train_y_vals = torch.stack(train_y_vals,dim=0)
-        return train_y_vals, last_layer_hidden_states
+            #either append the image, or compute the loss
+            if forward_mode == 'Train':
+                train_y_vals.append(torch.squeeze(train_y, 0))
+                if t == seq_len - 1:
+                    last_layer_hidden_states = hidden_states
+
+            elif forward_mode == 'Validation':
+                forward_loss += loss(torch.squeeze(train_y, 0), dev_y[t]).item()
+                if t == 0:
+                    #save hidden states from the last ground truth fitted value
+                    # and then use this value as an initial state in the next
+                    # sequence
+                    last_layer_hidden_states = hidden_states
+
+
+        if forward_mode == 'Train':
+            #convert all outputs from the current sequence to tensor (stack along feature axes)
+            train_y_vals = torch.stack(train_y_vals,dim=0)
+            mode_output = train_y_vals
+        elif forward_mode == 'Validation':
+            mode_output = forward_loss
+
+        return mode_output, last_layer_hidden_states
 
 
 
