@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from train import run_experiments
 import random
 from db import create_database
+from random import randint, uniform
 
 
 

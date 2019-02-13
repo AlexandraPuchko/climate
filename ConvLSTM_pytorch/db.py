@@ -16,7 +16,7 @@ def create_database(db_name):
     exp_id = cur.fetchone()[0]
     exp_id = 0 if exp_id is None else exp_id + 1
 
-    return cursor, conn, exp_id
+    return cur, conn, exp_id
 
 
 
