@@ -10,6 +10,7 @@ from train import run_experiments
 import random
 from db import create_database
 from random import randint, uniform
+from db import insert_results, insert_exps
 
 
 
@@ -236,12 +237,12 @@ def main():
     for exp_id in range(0, num_exps):
 
         layers_sizes, epochs, lr = generate_params()
-        insert_exps(exp_id, cur, layers_sizes, lr, epochs)
+        insert_exps(cur, exp_id,layers_sizes, lr, epochs)
 
         # run the experiment
-        print('running experiment {}: {}, {}, {}, {}'.format(exp_id, len(layers_sizes), layers_sizes,lr, epochs))
+        print('running experiment exp_id: {},  layers_sizes: {}, layers: {}, lr: {}, epochs: {}'.format(exp_id, len(layers_sizes), layers_sizes,lr, epochs))
 
-        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=len(layers_sizes))
+        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=layers_sizes,kernel_size=(3, 3),num_layers=len(layers_sizes))
         #use GPU
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         convLSTM = convLSTM.to(device)

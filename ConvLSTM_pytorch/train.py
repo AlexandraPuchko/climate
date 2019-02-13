@@ -7,7 +7,7 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 import time
-from db import insert_results, insert_exps
+from db import insert_results
 
 
 
@@ -69,8 +69,10 @@ def evaluate(net, loss, dev_x, dev_y, hidden_states, device):
     for step in range(seq_len):
         epsilon = 0#validation
         step_loss, hidden_states = net(dev_x[:,step:], hidden_states, epsilon, device, 'Validation', loss, step, dev_y[step:])
-        print('Step %d loss = %.10f' % (step, step_loss))
+
         dev_loss += step_loss
+
+    print('Dev loss = %.10f' % dev_loss)
 
     return dev_loss
 
@@ -109,7 +111,7 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
         #init epsilon for scheduled sampling
         epsilon = 1.0
-        compute_decay_constants(args.epochs)
+        compute_decay_constants(epochs)
 
         net.train()
 
