@@ -69,6 +69,5 @@ class ConvLSTMCell(nn.Module):
     # (B*Cin*H*W)
     def init_hidden(self, batch_size):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        #init tensor with zeros
         return (Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).to(device),
                 Variable(torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).to(device))

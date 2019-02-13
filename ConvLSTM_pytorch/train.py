@@ -52,7 +52,7 @@ def showPlot(dev_size, mae, std, epoch, layer):
 
 
 
-def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
+def evaluateNet(net, loss, dev_x, dev_y, hidden_states, device):
 
 
 
@@ -61,9 +61,7 @@ def evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, device):
     #1) feed model with a hidden states from the training mode
     #2) do pass through all the data in a dev set
 
-    hidden_states = prev_hidden_states
     dev_loss = 0
-    #get new hidden states on every pass through the sequence
     dev_y = torch.squeeze(torch.tensor(dev_y), 0)
 
     for step in range(seq_len):
@@ -82,7 +80,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         print('Training started...Exp_id = %d' % exp_id)
         train_start_time = time.time()
 
-
+        #parse dev set
         mb_row = 0
         row_start = mb_row*args.mb
         row_end = np.min([(mb_row+1)*args.mb, len(dev_seqs)]) # Last minibatch might be partial
@@ -104,13 +102,15 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         model_state = {}
         best_dev_err = float('inf')
         bad_count = 0
+        hidden_states = None
         num_seqs = len(train_seqs)
+
         print("Number of sequences in a training set: %d" % int(np.floor(num_seqs / args.mb)))
 
         #init epsilon for scheduled sampling
         epsilon = 1.0
         compute_decay_constants(args.epochs)
-        hidden_states = None
+
 
         for epoch in range(args.epochs):
             print("Epoch %d" % epoch)
@@ -134,7 +134,6 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
                 hidden_states = prev_hidden_states
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.item())
-                # training
                 optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
@@ -148,9 +147,8 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
             net.eval()
             with torch.no_grad():
                 curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
+
             net.train()
-
-
 
             hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
             print("exp_id = %d, dev error = %.7f, epoch = %d, layers = %d, hidden_dim_ls = %s" % (exp_id, curr_dev_err, epoch, net.num_layers, hidden_dim_ls))
@@ -178,8 +176,6 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
 
 
         print('Training finished...')
-        train_end_time = (time.time() - train_start_time) // 60
-        print('Time elapsed...%d sec' % train_end_time)
                 #
                 #
                 # # Reshape output for writing to netCDF

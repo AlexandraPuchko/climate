@@ -55,9 +55,6 @@ def parse_all_args():
                          type=str,
                          choices=["log"],
                          help="Set normalization scheme. Choice must be in the set {log}")
-    #  parser.add_argument("-area_weighted",
-    #                      action='store_true',
-    #                      help="Train using area-weighted MSE loss function.")
 
      # Output Flags
      parser.add_argument("-dev_preds", type=str,
@@ -96,8 +93,7 @@ def split_data(pr, nc_time, norm_type, max_len):
      if norm_type == "log":
          pr = log_normalize(pr, train_len)
 
-     # Create sequences.
-     # TODO: Create 'lens' list to pass to 'sequence_length' parameter in dynamic_rnn to handle the last few data points.
+
      num_seqs = (len(pr)) // max_len
      for i in range(num_seqs):
          ins.append(pr[i*max_len:(i+1)*max_len])
@@ -114,10 +110,6 @@ def split_data(pr, nc_time, norm_type, max_len):
      # dev (15%)-> concatenate all inputs into one long dev
      dev_ub = (train_len + dev_len)
      dev_seqs = inputs[train_len:dev_ub]
-    #  dev_merged = []
-    #  for i in range(0,len(dev_seqs)):
-    #      dev_merged.extend(dev_seqs[i])
-    #  dev_seqs = dev_merged
 
      dev_times = times[train_len:dev_ub]
 
@@ -201,6 +193,7 @@ def generate_params():
                                             # all of the values in the sequence will have to be 32
     end_pow = 5
     hidden_dim_param.append(2 ** start_pow)
+    layre = 2
     # randomly generate increasing sequence of hidden_dim size
     # based on the value of layer
     for i in range(layer - 1):
@@ -241,8 +234,6 @@ def main():
     #run 50 experiments
     for exp_id in range(0, 50):
         layer, hidden_dim_param, epochs = generate_params()
-        print(layer, hidden_dim_param, epochs)
-
         convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
         #use GPU
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

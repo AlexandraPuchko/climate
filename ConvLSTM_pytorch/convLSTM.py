@@ -125,13 +125,15 @@ class ConvLSTM(nn.Module):
             last_hidden_state = hidden_states[-1][0]
             train_y = self.cell_list[-1](last_hidden_state)
 
-            #either append the image, or compute the loss
+
             if forward_mode == 'Train':
                 train_y_vals.append(torch.squeeze(train_y, 0))
+                #save last hidden states to fit the next sequence
                 if t == seq_len - 1:
                     last_layer_hidden_states = hidden_states
 
             elif forward_mode == 'Validation':
+                #compute loss for the image
                 forward_loss += loss(torch.squeeze(train_y, 0), dev_y[t]).item()
                 if t == 0:
                     #save hidden states from the first ground truth fitted value
