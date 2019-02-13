@@ -7,6 +7,7 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 import time
+import sqlite3 as lite
 
 
 
@@ -34,6 +35,24 @@ def compute_decay_constants(epochs):
     LIN_DECAY_CONST = -1.0/float(epochs)
 
 
+
+
+def write_to_db():
+
+    con = None
+
+    try:
+        con = lite.connect('test.db')
+        cur = con.cursor()
+        cur.execute("INSERT INTO SCHOOL (ID,NAME,AGE,ADDRESS,MARKS)
+      VALUES (1, 'Rohan', 14, 'Delhi', 200)")
+        conn.commit()
+        conn.close()
+
+        dev error = %.7f, epoch = %d, layers = %d, hidden_dim_ls
+
+
+
 def showPlot(dev_size, mae, std, epoch, layer):
 
     x_axes = [i for i in range(dev_size)]
@@ -52,7 +71,7 @@ def showPlot(dev_size, mae, std, epoch, layer):
 
 
 
-def evaluateNet(net, loss, dev_x, dev_y, hidden_states, device):
+def evaluate(net, loss, dev_x, dev_y, hidden_states, device):
 
 
 
@@ -75,7 +94,7 @@ def evaluateNet(net, loss, dev_x, dev_y, hidden_states, device):
 
 
 
-def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
+def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False):
 
         print('Training started...Exp_id = %d' % exp_id)
         train_start_time = time.time()
@@ -98,9 +117,7 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         dev_y = torch.squeeze(torch.tensor(dev_y),0).to(device)
 
 
-
-        model_state = {}
-        best_dev_err = float('inf')
+        best_dev_loss = float('inf')
         bad_count = 0
         hidden_states = None
         num_seqs = len(train_seqs)
@@ -111,8 +128,9 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
         epsilon = 1.0
         compute_decay_constants(args.epochs)
 
+        net.train()
 
-        for epoch in range(args.epochs):
+        for epoch in range(epochs):
             print("Epoch %d" % epoch)
 
             idx = np.random.permutation(num_seqs)
@@ -121,17 +139,15 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
             # First forward is done on the first sequence, then do k = len(sequence) shift
             # and apply hidden states and memory cell states from the last forward to a sequence
             for mb_row in range(int(np.floor(num_seqs / args.mb))):
+
                 row_start = mb_row*args.mb
                 row_end = np.min([(mb_row+1)*args.mb, num_seqs]) # Last minibatch might be partial
-
-
                 mb_x = train_seqs[row_start:row_end, 0:args.max_len-1]
                 mb_y = train_seqs[row_start:row_end, 1:args.max_len]
                 mb_y = torch.squeeze(torch.tensor(mb_y),0).to(device)
                 #think what to do with loss
-                train_outputs, prev_hidden_states = net(mb_x, hidden_states, epsilon,device,'Train',None, 0, None)
-                #update hidden_state to next sequence
-                hidden_states = prev_hidden_states
+                train_outputs, hidden_states = net(mb_x, hidden_states, epsilon,device,'Train',None, 0, None)
+
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.item())
                 optimizer.zero_grad()
@@ -146,28 +162,20 @@ def trainNet(exp_id, net, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, 
 
             net.eval()
             with torch.no_grad():
-                curr_dev_err = evaluateNet(net, loss, dev_x, dev_y, prev_hidden_states, "cuda:0")
+                dev_loss = evaluate(net, loss, dev_x, dev_y, hidden_states, "cuda:0")
 
             net.train()
+            # after each epoch, insert losses into results table
+            if cur:
+                insert_results(cur, exp_id, epoch, train_loss, dev_loss)
 
-            hidden_dim_ls = ', '.join(map(str, net.hidden_dim))
-            print("exp_id = %d, dev error = %.7f, epoch = %d, layers = %d, hidden_dim_ls = %s" % (exp_id, curr_dev_err, epoch, net.num_layers, hidden_dim_ls))
 
-            if plot:
-                showPlot(dev_x.size(1), mae, std, epoch, net.num_layers)
 
             bad_count += 1 #save model configuration and Error
-
-            if curr_dev_err < best_dev_err:
+            if dev_loss < best_dev_loss:
                 bad_count = 0
-                best_dev_err = curr_dev_err
+                best_dev_loss = dev_loss
                 torch.save(net.state_dict(), 'model.pt')
-
-                #write to a file
-                f = open(file_name, "a")
-
-
-                f.write("epochs: %d, epoch: %d, layers: %d, hidden_dim: %s, curr_dev_err: %.7f \n" % (args.epochs, epoch, net.num_layers, hidden_dim_ls, curr_dev_err))
 
             if bad_count > args.patience:
                 print('Converged due to early stopping...')

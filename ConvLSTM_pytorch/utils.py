@@ -7,8 +7,8 @@ import torch.optim as optim
 from convLSTM import ConvLSTM
 import matplotlib.pyplot as plt
 from train import trainNet
-import chocolate as choco
 import random
+import db
 
 
 
@@ -31,10 +31,6 @@ def parse_all_args():
          dev accuracy (int)",
                          type=int,
                          default=10)
-     parser.add_argument("-lr",
-                         type=float,
-                         help="The learning rate (a float) [default=0.001]",
-                         default=0.001)
      parser.add_argument("-mb",
                          type=int,
                          help="The minibatch size (an int) [default=1]",
@@ -47,10 +43,6 @@ def parse_all_args():
                          type=int,
                          help="The maximum length of a sequence (an int) [default=12]",
                          default=24)#2 * 12 months = 2 years
-     parser.add_argument("-epochs",
-                         type=int,
-                         help="The number of epochs to train for (an int) [default=20]",
-                         default=20)
      parser.add_argument("-normalize",
                          type=str,
                          choices=["log"],
@@ -179,30 +171,33 @@ def export_netCDF(z, nc, filename, devtime):
      prOut[:] = z
      dataset.close()
 
-def createLossAndOptimizer(net, learning_rate):
 
+def createLossAndOptimizer(net, learning_rate):
     loss = nn.MSELoss()
     optimizer = optim.SGD(net.parameters(), learning_rate)
-    return(loss, optimizer)
+
+    return loss, optimizer
+
+
 
 def generate_params():
     layer = random.randint(2, 30)
-    epoch = random.randint(50, 150)
-    hidden_dim_param = []
+    epochs = random.randint(50, 150)
+    lr = uniform(0.003, 0.045)
+    layers_sizes = []
     start_pow = random.choice([1, 2, 3, 4])#do not include 32 for start, otherwise
                                             # all of the values in the sequence will have to be 32
     end_pow = 5
-    hidden_dim_param.append(2 ** start_pow)
-    layre = 2
+    layers_sizes.append(2 ** start_pow)
     # randomly generate increasing sequence of hidden_dim size
     # based on the value of layer
     for i in range(layer - 1):
         rand_pow = random.randint(start_pow, end_pow)
         start_pow = rand_pow
-        hidden_dim_param.append(2 ** rand_pow)
+        layers_sizes.append(2 ** rand_pow)
+        
+    return layers_sizes, epochs, lr
 
-
-    return layer, hidden_dim_param, epoch
 
 
 
@@ -217,6 +212,8 @@ def main():
     pr = nc.variables['pr'][:]
     channels = 1 #precipitation value
 
+    #run 1000 experiments
+    num_exps = 1000
 
     '''
     Hyper-parameters:
@@ -231,16 +228,28 @@ def main():
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
 
+    cur, conn, exp_id = create_database('exps.db')
+
+
     #run 50 experiments
-    for exp_id in range(0, 50):
-        layer, hidden_dim_param, epochs = generate_params()
-        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=layer)
+    for exp_id in range(0, num_exps):
+
+        layers_sizes, epochs, lr = generate_params()
+        insert_exps(exp_id, cur, layers_sizes, lr, epochs)
+
+        # run the experiment
+        print('running experiment {}: {}, {}, {}'.format(exp_id, len(layers_sizes), layers_sizes,lr))
+
+        convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=len(layers_sizes))
         #use GPU
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         convLSTM = convLSTM.to(device)
-        loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=args.lr)
-        trainNet(exp_id, convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
+        loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=lr)
+        run_experiments(cur, exp_id, convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
 
+        exp_id += 1
+
+    conn.close()
 
 if __name__ == "__main__":
      main()
