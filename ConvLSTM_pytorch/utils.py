@@ -6,9 +6,9 @@ import torch
 import torch.optim as optim
 from convLSTM import ConvLSTM
 import matplotlib.pyplot as plt
-from train import trainNet
+from train import run_experiments
 import random
-import db
+from db import create_database
 
 
 
@@ -195,7 +195,7 @@ def generate_params():
         rand_pow = random.randint(start_pow, end_pow)
         start_pow = rand_pow
         layers_sizes.append(2 ** rand_pow)
-        
+
     return layers_sizes, epochs, lr
 
 
@@ -238,7 +238,7 @@ def main():
         insert_exps(exp_id, cur, layers_sizes, lr, epochs)
 
         # run the experiment
-        print('running experiment {}: {}, {}, {}'.format(exp_id, len(layers_sizes), layers_sizes,lr))
+        print('running experiment {}: {}, {}, {}, {}'.format(exp_id, len(layers_sizes), layers_sizes,lr, epochs))
 
         convLSTM = ConvLSTM(input_size=(64, 128),input_dim=channels,hidden_dim=hidden_dim_param,kernel_size=(3, 3),num_layers=len(layers_sizes))
         #use GPU

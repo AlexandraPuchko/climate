@@ -7,7 +7,7 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 import time
-import sqlite3 as lite
+from db import insert_results, insert_exps
 
 
 
@@ -33,23 +33,6 @@ def compute_decay_constants(epochs):
 
     LIN_DECAY_CONST
     LIN_DECAY_CONST = -1.0/float(epochs)
-
-
-
-
-def write_to_db():
-
-    con = None
-
-    try:
-        con = lite.connect('test.db')
-        cur = con.cursor()
-        cur.execute("INSERT INTO SCHOOL (ID,NAME,AGE,ADDRESS,MARKS)
-      VALUES (1, 'Rohan', 14, 'Delhi', 200)")
-        conn.commit()
-        conn.close()
-
-        dev error = %.7f, epoch = %d, layers = %d, hidden_dim_ls
 
 
 

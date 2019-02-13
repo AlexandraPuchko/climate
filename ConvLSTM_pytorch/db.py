@@ -2,7 +2,7 @@ import sqlite3
 
 
 def create_database(db_name):
-    conn = sqlite3.connect() # create DB or load if it already exists
+    conn = sqlite3.connect(db_name) # create DB or load if it already exists
     # get cursor to make queries, then add necessary tables if they don't exist
     cur = conn.cursor()
     cur.execute('create table if not exists experiments (exp_id integer, layers integer, \
