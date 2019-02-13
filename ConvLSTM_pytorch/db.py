@@ -32,7 +32,7 @@ def insert_exps(cur, exp_id, layers_sizes, epochs, lr):
 
 def insert_results(cur, exp_id, epoch, train_loss, dev_loss):
     # insert new experiment info into DB
-    cur.execute('insert into results values (?, ?, ?, ?, ?)',
+    cur.execute('insert into results values (?, ?, ?, ?)',
       (exp_id, epoch, train_loss, dev_loss))
     cur.connection.commit()
 
