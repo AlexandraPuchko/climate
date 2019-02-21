@@ -184,6 +184,7 @@ def createLossAndOptimizer(net, learning_rate):
 
 def generate_params():
     layer = random.randint(2, 30)
+    layer = 2
     epochs = random.randint(50, 150)
     lr = uniform(0.003, 0.045)
     layers_sizes = []
@@ -230,14 +231,14 @@ def main():
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
 
-    cur, conn, exp_id = create_database('exps.db')
+    cursor, conn, exp_id = create_database('exps.db')
 
 
     #run 50 experiments
     for exp_id in range(0, num_exps):
 
         layers_sizes, epochs, lr = generate_params()
-        insert_exps(cur, exp_id,layers_sizes, lr, epochs)
+        insert_exps(cursor, exp_id, layers_sizes, lr, epochs)
 
         # run the experiment
         print('running experiment exp_id: {},  layers_sizes: {}, layers: {}, lr: {}, epochs: {}'.format(exp_id, len(layers_sizes), layers_sizes,lr, epochs))
@@ -247,7 +248,7 @@ def main():
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         convLSTM = convLSTM.to(device)
         loss, optimizer = createLossAndOptimizer(convLSTM, learning_rate=lr)
-        run_experiments(cur, exp_id, convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
+        run_experiments(cursor, exp_id, convLSTM, loss, optimizer,train_seqs, dev_seqs, test_seqs,args, device, epochs, plot=False)
 
         exp_id += 1
 

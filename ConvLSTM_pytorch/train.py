@@ -36,21 +36,21 @@ def compute_decay_constants(epochs):
 
 
 
-def showPlot(dev_size, mae, std, epoch, layer):
-
-    x_axes = [i for i in range(dev_size)]
-    if epoch == 0 or epoch == 10 or epoch == 19:
-        mae = np.array(mae)
-        std = np.array(std)
-        std_upper = mae + std
-        std_lower = mae - std
-        plt.plot(seq_len, std_upper,'b',linestyle=':',alpha=0.3)
-        plt.plot(seq_len, std_lower,'b',linestyle=':',alpha=0.3)
-        plt.plot(seq_len, mae, 'r',linestyle=':', alpha=0.5) # plotting t, a separately
-        plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
-        plt.xlabel('Months')
-        plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
-        plt.savefig('train' + str(layer) + "_" + str(epoch) + '.png')
+# def showPlot(dev_size, mae, std, epoch, layer):
+#
+#     x_axes = [i for i in range(dev_size)]
+#     if epoch == 0 or epoch == 10 or epoch == 19:
+#         mae = np.array(mae)
+#         std = np.array(std)
+#         std_upper = mae + std
+#         std_lower = mae - std
+#         plt.plot(seq_len, std_upper,'b',linestyle=':',alpha=0.3)
+#         plt.plot(seq_len, std_lower,'b',linestyle=':',alpha=0.3)
+#         plt.plot(seq_len, mae, 'r',linestyle=':', alpha=0.5) # plotting t, a separately
+#         plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
+#         plt.xlabel('Months')
+#         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
+#         plt.savefig('train' + str(layer) + "_" + str(epoch) + '.png')
 
 
 
@@ -114,7 +114,8 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
         compute_decay_constants(epochs)
 
         net.train()
-
+        running_loss = 0#average running loss
+        running_ct = 0
         for epoch in range(epochs):
             print("Epoch %d" % epoch)
 
@@ -135,9 +136,12 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.item())
+                running_loss += train_loss.item()
+                running_ct += 1
                 optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
+
 
 
 
@@ -152,7 +156,7 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
             net.train()
             # after each epoch, insert losses into results table
             if cur:
-                insert_results(cur, exp_id, epoch, train_loss, dev_loss)
+                insert_results(cur, exp_id, epoch, running_loss / running_ct, dev_loss)
 
 
 

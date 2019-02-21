@@ -20,7 +20,7 @@ def create_database(db_name):
 
 
 
-def insert_exps(cur, exp_id, layers_sizes, epochs, lr):
+def insert_exps(cur, exp_id, layers_sizes, lr, epochs):
     # insert new experiment info into DB
     cur.execute('insert into experiments values (?, ?, ?, ?, ?)',
       (exp_id, len(layers_sizes), ' '.join(map(str, layers_sizes)), lr, epochs))
