@@ -171,7 +171,9 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
                 break
 
 
-
+        train_end_time = time.time()
+        elapsed = train_end_time - train_start_time
+        print('%d minutes for one experiment' % (elapsed / 60))
         print('Training finished...')
                 #
                 #
