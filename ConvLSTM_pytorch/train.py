@@ -94,7 +94,7 @@ def evaluate(net, loss, dev_x, dev_y, hidden_states,  device):
 
     dev_loss_mean = np.sum(mean_s) / len(mean_s)
 
-    print('Dev loss all = %.10f, Dev loss mean = %.10f' % dev_loss_all, dev_loss_mean)
+    print('Dev loss all = %.10f, Dev loss mean = %.10f' % (dev_loss_all, dev_loss_mean))
 
 
     return dev_loss_all, dev_loss_mean
@@ -179,7 +179,7 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
             net.train()
             # after each epoch, insert losses into results table
             if cur:
-                insert_results(cur, exp_id, epoch, running_loss / running_ct, dev_loss)
+                insert_results(cur, exp_id, epoch, running_loss / running_ct, dev_loss_all, dev_loss_mean)
 
 
 

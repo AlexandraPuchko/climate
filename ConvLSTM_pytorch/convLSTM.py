@@ -95,7 +95,7 @@ class ConvLSTM(nn.Module):
         # save all predicted maps to compute the loss
         train_y_vals = []
 
-        forward_loss = 0
+        forward_loss = []
         last_layer_hidden_states = None
 
         for t in range(seq_len):
@@ -134,7 +134,7 @@ class ConvLSTM(nn.Module):
 
             elif forward_mode == 'Validation':
                 #compute loss for the image
-                forward_loss += loss(torch.squeeze(train_y, 0), dev_y[t]).item()
+                forward_loss.append(loss(torch.squeeze(train_y, 0), dev_y[t]).item())
                 if t == 0:
                     #save hidden states from the first ground truth fitted value
                     # and use it as an initial state in the next sequence
