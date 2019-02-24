@@ -8,13 +8,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time
 from db import insert_results
+from viz import save_plot
+
 
 
 
 # NOTE: These constants assume the model converges around epoch 20.0 (default value)
 LIN_DECAY_CONST = (-1.0 / 20.0)
-file_name = "log.csv"
-
 
 #Static decay functions
 def linear(epoch):
@@ -36,27 +36,9 @@ def compute_decay_constants(epochs):
 
 
 
-# def showPlot(dev_size, mae, std, epoch, layer):
-#
-#     x_axes = [i for i in range(dev_size)]
-#     if epoch == 0 or epoch == 10 or epoch == 19:
-#         mae = np.array(mae)
-#         std = np.array(std)
-#         std_upper = mae + std
-#         std_lower = mae - std
-#         plt.plot(seq_len, std_upper,'b',linestyle=':',alpha=0.3)
-#         plt.plot(seq_len, std_lower,'b',linestyle=':',alpha=0.3)
-#         plt.plot(seq_len, mae, 'r',linestyle=':', alpha=0.5) # plotting t, a separately
-#         plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
-#         plt.xlabel('Months')
-#         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
-#         plt.savefig('train' + str(layer) + "_" + str(epoch) + '.png')
+def evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states,  device):
 
-
-
-def evaluate(net, loss, dev_x, dev_y, hidden_states,  device):
-
-
+    save_plots = False
 
     seq_len = dev_x.shape[1]
     print('Evaluating on dev set... (%d precipitation maps)' % seq_len)
@@ -91,6 +73,9 @@ def evaluate(net, loss, dev_x, dev_y, hidden_states,  device):
         mean_s[col] = column_sum / (seq_len - col)
         std_s[col] = np.std(column)
 
+    #plot mean, std, CI for one epoch
+    if save_plots:
+        save_plot(seq_len, exp_id, epoch, mean_s, std_s)
 
     dev_loss_mean = np.sum(mean_s) / len(mean_s)
 
@@ -174,7 +159,10 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
             net.eval()
             with torch.no_grad():
-                dev_loss_all, dev_loss_mean = evaluate(net, loss, dev_x, dev_y, hidden_states, "cuda:0")
+                dev_loss_all, dev_loss_mean = evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states, "cuda:0")
+ls
+
+            #plot mean and std and CI
 
             net.train()
             # after each epoch, insert losses into results table
