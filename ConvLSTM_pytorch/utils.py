@@ -186,7 +186,7 @@ def createLossAndOptimizer(net, learning_rate):
 
 
 def generate_params():
-    layer = random.randint(2, 18)
+    layer = random.randint(2, 15)
     epochs = random.randint(50, 150)
     lr = uniform(0.003, 0.045)
     layers_sizes = []

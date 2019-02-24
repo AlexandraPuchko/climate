@@ -1,25 +1,36 @@
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 
 
 
 
 
-def save_plot(seq_len, exp_id, epoch, mean_s, std_s):
-#
-#     x_axes = [i for i in range(dev_size)]
-#     if epoch == 0 or epoch == 10 or epoch == 19:
-#         mae = np.array(mae)
-#         std = np.array(std)
-#         std_upper = mae + std
-#         std_lower = mae - std
-#         plt.plot(seq_len, std_upper,'b',linestyle=':',alpha=0.3)
-#         plt.plot(seq_len, std_lower,'b',linestyle=':',alpha=0.3)
-#         plt.plot(seq_len, mae, 'r',linestyle=':', alpha=0.5) # plotting t, a separately
-#         plt.fill_between(seq_len, std_upper, std_lower, alpha=0.1)
-#         plt.xlabel('Months')
-#         plt.ylabel('μ (red), [μ - std, μ + std] (blue)')
+def save_plot(seq_len, exp_id, epochs, MSE_vals):
 
-        file_name = 'plots/' + 'exp_' + str(exp_id) + '/ep_' + str(epoch)
-        plt.savefig(file_name + '.png')
+    sns_plot = data = None
+    fig = None
+    file_name = 'plots/' + 'exp_' + str(exp_id)
+
+    # for i in range(epochs):
+    #     print(MSE_vals[i])
+    #     df = convert_to_dataframe(seq_len, MSE_vals[i])
+    #     sns.palplot(sns.color_palette("Blues_d", epochs)
+    #     sns_plot = sns.lineplot(x='Months', y='MSE', data=df)
+    #
+    # fig = sns_plot.get_figure()
+    # fig.savefig(file_name + '.png')
+
+
+
+
+
+def convert_to_dataframe(seq_len, MSE_vals):
+    months = np.arange(seq_len)
+    MSE_vals = np.asarray(MSE_vals)
+
+    data = pd.DataFrame({'MSE':MSE_vals, 'Months':months })
+
+    return data

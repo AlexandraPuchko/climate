@@ -22,18 +22,16 @@ def create_database(db_name):
 
 def insert_exps(cur, exp_id, layers_sizes, lr, epochs):
     # insert new experiment info into DB
-    cur.execute('insert into experiments values (?, ?, ?, ?, ?)',
-      (exp_id, len(layers_sizes), ' '.join(map(str, layers_sizes)), lr, epochs))
+    cur.execute('insert into experiments values (?, ?, ?, ?, ?)', (exp_id, len(layers_sizes), ' '.join(map(str, layers_sizes)), lr, epochs))
     cur.connection.commit()
 
     return
 
 
 
-def insert_results(cur, exp_id, epoch, train_loss, dev_loss_all, dev_loss_mean):
-    # insert new experiment info into DB
-    cur.execute('insert into results values (?, ?, ?, ?, ?)',
-      (exp_id, epoch, train_loss, dev_loss_all, dev_loss_mean))
+def insert_results(cur, exp_id, epoch, dev_loss_all, dev_loss_mean):
+
+    cur.execute('insert into results values (?, ?, ?, ?)', (exp_id, epoch, dev_loss_all, dev_loss_mean))
     cur.connection.commit()
 
     return

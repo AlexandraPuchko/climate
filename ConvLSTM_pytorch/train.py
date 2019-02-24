@@ -38,8 +38,6 @@ def compute_decay_constants(epochs):
 
 def evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states,  device):
 
-    save_plots = False
-
     seq_len = dev_x.shape[1]
     print('Evaluating on dev set... (%d precipitation maps)' % seq_len)
     #1) feed model with a hidden states from the training mode
@@ -49,8 +47,9 @@ def evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states,  device):
     dev_y = torch.squeeze(torch.tensor(dev_y), 0)
 
     losses = np.zeros((seq_len, seq_len))
-    mean_s = np.zeros(seq_len)
-    std_s = np.zeros(seq_len)
+    #how well we predict one month on average
+    MSE_per_month_arr = np.zeros(seq_len)
+    # std_s_arr = np.zeros(seq_len)
     dev_loss_mean = 0
     dev_loss_all = 0
 
@@ -70,19 +69,16 @@ def evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states,  device):
         column = losses[0:seq_len - col,col]
         column_sum = np.sum(column)
         dev_loss_all += column_sum
-        mean_s[col] = column_sum / (seq_len - col)
-        std_s[col] = np.std(column)
+        MSE_per_month_arr[col] = column_sum / (seq_len - col)
+        # std_s_arr[col] = np.std(column)
 
-    #plot mean, std, CI for one epoch
-    if save_plots:
-        save_plot(seq_len, exp_id, epoch, mean_s, std_s)
 
-    dev_loss_mean = np.sum(mean_s) / len(mean_s)
+    dev_loss_mean = np.sum(MSE_per_month_arr) / len(MSE_per_month_arr)
 
     print('Dev loss all = %.10f, Dev loss mean = %.10f' % (dev_loss_all, dev_loss_mean))
 
 
-    return dev_loss_all, dev_loss_mean
+    return (dev_loss_all, dev_loss_mean, MSE_per_month_arr)
 
 
 
@@ -109,11 +105,15 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
         dev_y = torch.squeeze(torch.tensor(dev_y),0).to(device)
 
+        #variables used for plotting means
+        all_MSEs_per_month = []
+        #--------
 
         best_dev_loss = float('inf')
         dev_loss_all = dev_loss_mean = 0
         bad_count = 0
         hidden_states = None
+        dev_len = 0
         num_seqs = len(train_seqs)
 
         print("Number of sequences in a training set: %d" % int(np.floor(num_seqs / args.mb)))
@@ -123,8 +123,7 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
         compute_decay_constants(epochs)
 
         net.train()
-        running_loss = 0#average running loss
-        running_ct = 0
+
         for epoch in range(epochs):
             print("Epoch %d" % epoch)
 
@@ -145,8 +144,6 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
                 train_loss = loss(train_outputs, mb_y)
                 print("Train loss = %.7f" % train_loss.item())
-                running_loss += train_loss.item()
-                running_ct += 1
                 optimizer.zero_grad()
                 train_loss.backward()
                 optimizer.step()
@@ -159,15 +156,17 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
             net.eval()
             with torch.no_grad():
-                dev_loss_all, dev_loss_mean = evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states, "cuda:0")
-ls
+                dev_loss_all, dev_loss_mean, MSEs_per_month = evaluate(net, loss, exp_id, epoch, dev_x, dev_y, hidden_states, "cuda:0")
+                dev_len = len(MSEs_per_month)
+                print(dev_len)
+                all_MSEs_per_month.append(MSEs_per_month)
 
-            #plot mean and std and CI
+
 
             net.train()
             # after each epoch, insert losses into results table
             if cur:
-                insert_results(cur, exp_id, epoch, running_loss / running_ct, dev_loss_all, dev_loss_mean)
+                insert_results(cur, exp_id, epoch, dev_loss_all, dev_loss_mean)
 
 
 
@@ -180,6 +179,12 @@ ls
             if bad_count > args.patience:
                 print('Converged due to early stopping...')
                 break
+
+
+        #plot mean, std, CI for all epochs
+        save_plots = False
+        if save_plots:
+            save_plot(dev_len, exp_id, epochs, all_MSEs_per_month)
 
 
         train_end_time = time.time()
