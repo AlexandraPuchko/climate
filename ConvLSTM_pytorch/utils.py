@@ -49,7 +49,10 @@ def parse_all_args():
                          type=str,
                          choices=["log"],
                          help="Set normalization scheme. Choice must be in the set {log}")
-
+    # parser.add_argument("-evaluation_type",
+    #                     type=str,
+    #                     choices=["log"],
+    #                     help="Evaluation type (either sum up all of the values in the triangle, or compute the mean)")
      # Output Flags
      parser.add_argument("-dev_preds", type=str,
                          help="Model's predictions on the dev set, exported as a NetCDF",
@@ -183,7 +186,7 @@ def createLossAndOptimizer(net, learning_rate):
 
 
 def generate_params():
-    layer = random.randint(2, 30)
+    layer = random.randint(2, 18)
     epochs = random.randint(50, 150)
     lr = uniform(0.003, 0.045)
     layers_sizes = []

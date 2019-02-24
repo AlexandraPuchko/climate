@@ -54,7 +54,7 @@ def compute_decay_constants(epochs):
 
 
 
-def evaluate(net, loss, dev_x, dev_y, hidden_states, device):
+def evaluate(net, loss, dev_x, dev_y, hidden_states,  device):
 
 
 
@@ -66,15 +66,38 @@ def evaluate(net, loss, dev_x, dev_y, hidden_states, device):
     dev_loss = 0
     dev_y = torch.squeeze(torch.tensor(dev_y), 0)
 
+    losses = np.zeros((seq_len, seq_len))
+    mean_s = np.zeros(seq_len)
+    std_s = np.zeros(seq_len)
+    dev_loss_mean = 0
+    dev_loss_all = 0
+
+    #evaluate via computing all losses in the triangle
+    # if evaluation_type == 'compute_all':
     for step in range(seq_len):
         epsilon = 0#validation
         step_loss, hidden_states = net(dev_x[:,step:], hidden_states, epsilon, device, 'Validation', loss, step, dev_y[step:])
+        #save all losses for one step
+        losses[step,0:len(step_loss)] = step_loss
 
-        dev_loss += step_loss
+    # evaluate via computing how well model is doing one month ahead
+    #compute mean and std for dev set for each column
+    #first extract column from the triangle, do not take
+    #into account zeros
+    for col in range(seq_len):
+        column = losses[0:seq_len - col,col]
+        column_sum = np.sum(column)
+        dev_loss_all += column_sum
+        mean_s[col] = column_sum / (seq_len - col)
+        std_s[col] = np.std(column)
 
-    print('Dev loss = %.10f' % dev_loss)
 
-    return dev_loss
+    dev_loss_mean = np.sum(mean_s) / len(mean_s)
+
+    print('Dev loss all = %.10f, Dev loss mean = %.10f' % dev_loss_all, dev_loss_mean)
+
+
+    return dev_loss_all, dev_loss_mean
 
 
 
@@ -103,6 +126,7 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
 
         best_dev_loss = float('inf')
+        dev_loss_all = dev_loss_mean = 0
         bad_count = 0
         hidden_states = None
         num_seqs = len(train_seqs)
@@ -145,13 +169,12 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
 
 
-
             epsilon = update_epsilon(epoch)
             print("Linear decay applied. epsilon=%.5f" % epsilon)
 
             net.eval()
             with torch.no_grad():
-                dev_loss = evaluate(net, loss, dev_x, dev_y, hidden_states, "cuda:0")
+                dev_loss_all, dev_loss_mean = evaluate(net, loss, dev_x, dev_y, hidden_states, "cuda:0")
 
             net.train()
             # after each epoch, insert losses into results table
@@ -161,9 +184,9 @@ def run_experiments(cur, exp_id, net, loss, optimizer,train_seqs, dev_seqs, test
 
 
             bad_count += 1 #save model configuration and Error
-            if dev_loss < best_dev_loss:
+            if dev_loss_mean < best_dev_loss:
                 bad_count = 0
-                best_dev_loss = dev_loss
+                best_dev_loss = dev_loss_mean
                 torch.save(net.state_dict(), 'model.pt')
 
             if bad_count > args.patience:
