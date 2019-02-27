@@ -26,6 +26,13 @@ def parse_all_args():
      # Positional Arguments
      parser.add_argument("netcdf",
                          help="Data set(a nc)")
+     parser.add_argument("max_layers",
+                         type=int,
+                         help="Max number of layers [default=15]",
+                         default=10)
+     parser.add_argument("db_name",
+                       type=str,
+                       help="Database name")
 
     #  # Model Flags
      parser.add_argument("-patience",
@@ -37,6 +44,7 @@ def parse_all_args():
                          type=int,
                          help="The minibatch size (an int) [default=1]",
                          default=1)
+
      parser.add_argument("-num-steps",
                          type=int,
                          help="The number of steps to unroll for Truncated BPTT (an int) [default=20]",
@@ -185,8 +193,8 @@ def createLossAndOptimizer(net, learning_rate):
 
 
 
-def generate_params():
-    layer = random.randint(2, 15)
+def generate_params(max_layers):
+    layer = random.randint(2, max_layers)
     epochs = random.randint(50, 150)
     lr = uniform(0.003, 0.045)
     layers_sizes = []
@@ -233,13 +241,14 @@ def main():
     train_seqs, dev_seqs, test_seqs = split_data(pr, time, args.normalize, args.max_len)
     print('Finished loading and splitting data.')
 
-    cursor, conn, exp_id = create_database('exps.db')
+    db_name = args.db_name + '.db'
+    cursor, conn, exp_id = create_database(db_name)
 
 
     #run 50 experiments
     for exp_id in range(0, num_exps):
 
-        layers_sizes, epochs, lr = generate_params()
+        layers_sizes, epochs, lr = generate_params(args.max_layers)
         insert_exps(cursor, exp_id, layers_sizes, lr, epochs)
 
         # run the experiment
